@@ -179,6 +179,24 @@ test('chamber object names have leaders and the film grain inset starts hidden',
     const group = groups.find(([, content]) => content.includes(`>${name}</text>`));
     assert.ok(group && /class="annotation-arrow"/.test(group[1]), name);
   }
+  const waferLabel = groups.find(([, content]) => content.includes('>Substrate</text>'))[1];
+  assert.match(waferLabel, /y="190".*>Substrate<\/text>/);
+  assert.match(waferLabel, /M396 186h12v-35l-10-19/);
   assert.match(diagram, /id="film-grain-inset" visibility="hidden"/);
   assert.match(diagram, /id="chamber-grain-map"/);
+});
+
+test('electrodes and supply labels follow the connected circuit', () => {
+  const diagramOf = (method) => {
+    const { config, settings, material, sample } = scene(method);
+    return chamberMarkup(config, method, settings, material, sample.film);
+  };
+  assert.match(diagramOf('rf'), /~ RF<\/text>/);
+  assert.match(diagramOf('rf'), /V425H442M454 425H530V396/);
+  assert.match(diagramOf('dc'), /Target cathode feed/);
+  assert.match(diagramOf('ebeam'), /Negative electron emitter/);
+  assert.match(diagramOf('ebeam'), /Grounded hearth/);
+  assert.match(diagramOf('arc'), /Arc anode return/);
+  assert.match(diagramOf('classic'), /class="electrical-node voltage" cx="300" cy="109"/);
+  assert.match(diagramOf('ibad'), /Negative acceleration grid/);
 });

@@ -6,8 +6,8 @@ const FILM_COLOURS = {
   'Indium tin oxide': '#afc8bd', Silica: '#e3eceb',
 };
 const SUBSTRATE_FINISH = {
-  silicon: ['#69748a', .36], borofloat: ['#8ca8a3', .08], silica: ['#b2c4cd', .03],
-  steel: ['#a8b0b4', .75], polycarbonate: ['#b0bcb2', .07], kapton: ['#c77935', .03],
+  silicon: ['#69748a', .36, .024], borofloat: ['#8ca8a3', .08, .021], silica: ['#b2c4cd', .03, .016],
+  steel: ['#a8b0b4', .75, .21], polycarbonate: ['#b0bcb2', .07, .075], kapton: ['#c77935', .03, .10],
 };
 const TRANSPARENT_FILMS = new Set(['Indium tin oxide', 'Silica']);
 
@@ -20,7 +20,8 @@ export function lightboxFilmAppearance(profile, model) {
   const voidFraction = bare ? 0 : (model?.voidFraction ?? 0);
   // Map the teaching model's heights to perceptual roughness. The scale sets
   // the visual response and is not an optical fit or an absolute gloss value.
-  const roughness = Math.min(.95, .075 + .74 * -Math.expm1(-roughnessNm / 15)
+  const roughnessScale = (roughnessNm / 17) ** 1.35;
+  const roughness = Math.min(.95, .012 + .82 * -Math.expm1(-roughnessScale)
     + .30 * voidFraction + .28 * (1 - coverage));
   const radialProfile = Uint8Array.from(profile.slice(centre), (right, index) => {
     const height = (right + profile[centre - index]) / 2;
@@ -47,6 +48,7 @@ uniform sampler2D profileMap;
 uniform vec2 profileRange;
 uniform vec4 filmFinish;
 uniform vec4 baseFinish;
+uniform float substrateRoughness;
 uniform vec4 filmState;
 uniform float raking;
 
@@ -129,22 +131,22 @@ void main() {
   vec2 jitter = vec2(surfaceNoise(id+vec2(2.,21.)),surfaceNoise(id+vec2(32.,5.)))-.5;
   float hole = surfaceNoise(id);
   float patch = length(fract(cell)-.5-.46*jitter);
-  float pinhole = step(hole, min(.82,(1.-continuity)*1.8)) * (1.-smoothstep(.15,.43,patch));
+  float pinhole = (1.-step(min(.82,(1.-continuity)*1.8),hole)) * (1.-smoothstep(.15,.43,patch));
   pinhole = mix(step(continuity,hole),pinhole,smoothstep(.15,.55,continuity));
-  float pit = step(hole, porosity*.58) * (1.-smoothstep(.05,.22,patch));
+  float pit = (1.-step(porosity*.58,hole)) * (1.-smoothstep(.05,.22,patch));
   float mottling = surfaceNoise(floor(point.xy*17.));
   float metal = filmFinish.a;
   float opacity = (1.-exp(-thickness/mix(13.,6.,metal))) * (1.-pinhole);
   if (!top) opacity = 0.;
-  float localRoughness = mix(.16 + .14*baseFinish.a, min(.98,rough + .22*pit), opacity);
+  float localRoughness = mix(substrateRoughness, min(.98,rough + .22*pit), opacity);
   vec3 tint = mix(baseFinish.rgb, filmFinish.rgb, opacity*mix(.20,1.,metal));
   float metallic = mix(baseFinish.a, metal, opacity);
-  vec2 detail = vec2(surfaceNoise(point.xy*212.),surfaceNoise(point.yx*223.+4.))-.5;
-  normal = normalize(normal + vec3(detail,0.) * (localRoughness*.20*opacity));
   vec3 n = world(normal);
   float facing = max(0.,dot(n,-ray));
   vec3 reflection = reflect(ray,n);
-  float spread = .017 + .35*localRoughness;
+  // Keep the clean mirror edge antialiased at the current pixel size.
+  // Surface scatter broadens the analytic reflection without pixel noise.
+  float spread = 1.8/min(viewport.x,viewport.y) + .47*pow(localRoughness,1.55);
   vec3 primaryAim = normalize(mix(vec3(-.38,.73,.60),vec3(-.92,.28,.39),raking));
   float key = panel(reflection,primaryAim,mix(vec2(.29,.145),vec2(.26,.06),raking),spread);
   float fill = panel(reflection,normalize(vec3(.67,-.23,.72)),vec2(.15,.42),spread*.9);
@@ -156,7 +158,7 @@ void main() {
     + sheen*(key*vec3(3.1,3.0,2.77) + fill*vec3(1.28,1.45,1.72));
   float sideLight = .26+.56*max(0.,dot(n,primaryAim)) + .14*max(0.,n.z);
   vec3 diffuse = tint*sideLight*mix(.93,.31,metallic);
-  float blemish = 1. - opacity*((.40+.14*raking)*pit + (.24*porosity + .12*rough)*mottling);
+  float blemish = 1. - opacity*((.40+.14*raking)*pit + (.24*porosity + .16*rough*rough)*mottling);
   vec3 rgb = max(vec3(0.),(diffuse + reflected*fresnel)*blemish);
   rgb = rgb/(1.+.52*rgb);
   gl_FragColor = vec4(pow(clamp(rgb,0.,1.),vec3(.4545)),1.);
@@ -189,7 +191,7 @@ function lightboxGL(canvas) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const uniforms = ['viewport','rotation','profileRange','filmFinish','baseFinish','filmState','raking'];
+  const uniforms = ['viewport','rotation','profileRange','filmFinish','baseFinish','substrateRoughness','filmState','raking'];
   return { gl, uniform: Object.fromEntries(uniforms.map(name => [name, gl.getUniformLocation(program, name)])) };
 }
 
@@ -276,7 +278,7 @@ export class FilmLightbox {
     this.appearance = appearance;
     this.filmColour = FILM_COLOURS[film.name] ?? film.colour;
     const transparent = TRANSPARENT_FILMS.has(film.name);
-    const [substrateColour, substrateMetal] = SUBSTRATE_FINISH[wafer] ?? SUBSTRATE_FINISH.silicon;
+    const [substrateColour, substrateMetal, substrateRoughness] = SUBSTRATE_FINISH[wafer] ?? SUBSTRATE_FINISH.silicon;
     this.substrateColour = substrateColour;
     const finish = appearance.bare ? 'Bare substrate'
       : `${film.formula ?? film.name} · ${appearance.centre.toFixed(1)} nm centre · ${appearance.edge.toFixed(1)} nm edge`;
@@ -292,6 +294,7 @@ export class FilmLightbox {
       gl.uniform2f(uniform.profileRange, .5 / radialProfile.length, peak);
       gl.uniform4fv(uniform.filmFinish, finishChannels(this.filmColour, transparent ? .04 : .82));
       gl.uniform4fv(uniform.baseFinish, finishChannels(substrateColour, substrateMetal));
+      gl.uniform1f(uniform.substrateRoughness, substrateRoughness);
       gl.uniform4f(uniform.filmState, roughness, coverage, voidFraction, -Math.expm1(-scatter));
     }
     this.schedule();
@@ -315,8 +318,8 @@ export class FilmLightbox {
   draw() {
     const { canvas, appearance } = this;
     if (!appearance || !canvas.clientWidth || !canvas.clientHeight) return;
-    const pixelLimit = this.drag ? 260000 : 520000;
-    const density = Math.min(1.45, devicePixelRatio || 1, Math.sqrt(pixelLimit / (canvas.clientWidth * canvas.clientHeight)));
+    const pixelLimit = this.drag ? 260000 : 780000;
+    const density = Math.min(this.drag ? 1.45 : 1.75, devicePixelRatio || 1, Math.sqrt(pixelLimit / (canvas.clientWidth * canvas.clientHeight)));
     const width = Math.max(1, Math.round(canvas.clientWidth * density));
     const height = Math.max(1, Math.round(canvas.clientHeight * density));
     if (canvas.width !== width) canvas.width = width;
@@ -347,7 +350,7 @@ export class FilmLightbox {
     const gloss = 1 - this.appearance.roughness;
     const highlight = ctx.createLinearGradient(-radius,-radius,radius,radius);
     const centre = .5 + .29*Math.sin(yaw - pitch + (this.lighting === 'raking' ? .85 : 0));
-    const spread = .04 + .30*this.appearance.roughness;
+    const spread = .009 + .32*this.appearance.roughness ** 1.35;
     highlight.addColorStop(0,colour);
     highlight.addColorStop(Math.max(.02,centre-spread),colour);
     highlight.addColorStop(centre,`rgba(255,255,255,${.23 + .60*gloss})`);

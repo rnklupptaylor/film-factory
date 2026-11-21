@@ -25,22 +25,31 @@ function annotation(label, x, y, leader, { anchor = 'start', detail = '' } = {})
   </g>`;
 }
 
-function supply(x, y, title, first, second, type, id = '', wiring = 'ground') {
-  const ground = wiring === 'ground';
-  const contacts = ground ? `<circle cx="${x}" cy="${y + 39}" r="3.3"/>
-    <circle cx="${x + 80}" cy="${y + 70}" r="3.3"/>`
-    : `<circle cx="${x + 27}" cy="${y + 70}" r="3.3"/><circle cx="${x + 75}" cy="${y + 70}" r="3.3"/>`;
+function supply(x, y, title, first, second, {type = 'voltage', id = '', side = false, earthReturn = false, rating = ''} = {}) {
+  const firstX = x + 27;
+  const secondX = x + 77;
+  const connectorY = y + 70;
+  const captions = side
+    ? `<circle cx="${x}" cy="${y + 39}" r="3.4"/>
+      <text x="${x + 10}" y="${y + 43}" id="${id}">${first}</text>
+      <text class="terminal-caption" x="${secondX}" y="${y + 62}" text-anchor="middle">${second}</text>`
+    : `<circle cx="${firstX}" cy="${connectorY}" r="3.4"/>
+      <text class="terminal-caption" x="${firstX}" y="${y + 62}" text-anchor="middle">${first}</text>
+      <text class="terminal-caption" x="${secondX}" y="${y + 62}" text-anchor="middle">${second}</text>`;
   return `<g class="supply ${type}">
     <rect x="${x}" y="${y}" width="105" height="70" rx="8"/>
-    <text class="supply-title" x="${x + 12}" y="${y + 22}">${title}</text>
-    ${contacts}
-    <text x="${x + 10}" y="${y + 44}" ${id ? `id="${id}"` : ''}>${first}</text>
-    <text x="${x + 10}" y="${y + 63}">${second}</text>
-  </g>${ground ? `<path class="ground-wire" d="M${x + 80} ${y + 73}v5"/>${earth(x + 80, y + 78)}` : ''}`;
+    <text class="supply-title" x="${x + 10}" y="${y + 20}">${title}</text>
+    ${rating ? `<text x="${x + 10}" y="${y + 40}">${rating}</text>` : ''}
+    ${captions}<circle cx="${secondX}" cy="${connectorY}" r="3.4"/>
+  </g>${earthReturn ? `<path class="ground-wire" d="M${secondX} ${connectorY + 3}v5"/>${earth(secondX, connectorY + 8)}` : ''}`;
 }
 
-function terminal(x, y, sign, type = 'voltage') {
-  return `<g class="terminal ${type}"><circle cx="${x}" cy="${y}" r="10"/><text x="${x}" y="${y + 5.2}" text-anchor="middle">${sign}</text></g>`;
+function electricalContact(x, y, type, label) {
+  return `<circle class="electrical-node ${type}" cx="${x}" cy="${y}" r="3.3"><title>${label}</title></circle>`;
+}
+
+function floorFeedthrough(x) {
+  return `<g class="feedthrough"><rect x="${x - 8}" y="394" width="16" height="21" rx="3"/></g>`;
 }
 
 function circuitMarkup(config, method, y, preclean) {
@@ -48,35 +57,39 @@ function circuitMarkup(config, method, y, preclean) {
   const groundedSubstrate = `<path class="ground-wire" d="M300 81V51h-67"/>${earth(233, 51)}
     <text class="chamber-label minor" x="202" y="58">0 V</text>`;
   const bias = `<path class="voltage-wire" d="M300 81V48h196v38h7"/>
-    ${supply(503, 47, 'Substrate bias', '− Vₛ', '+ return', 'voltage', 'chamber-bias')}
-    ${terminal(425, 135, '−')}`;
-  const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/><path d="M300 64v46"/></g>`;
+    ${supply(503, 47, 'Substrate bias', '− Vₛ', '+ return', {id:'chamber-bias',side:true,earthReturn:true})}`;
+  const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/></g>
+    <path class="${biased ? 'voltage-wire' : 'ground-wire'}" d="M300 64v45"/>
+    ${electricalContact(300,109,biased ? 'voltage' : 'ground','Substrate holder connection')}`;
   const shell = `<path class="ground-wire" d="M105 348H83"/>${earth(83, 348)}
-    <text class="chamber-label minor" x="9" y="354">${config.diode ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
+    <text class="chamber-label minor" x="9" y="354">${config.diode || config.classic ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
   const yBox = 326;
-  const yTop = yBox + 39;
   let source;
   if (config.family === 'sputtering' || config.arc) {
     const title = method === 'rf' ? 'RF supply' : config.duty ? 'Pulsed DC' : config.arc ? 'Arc supply' : config.diode ? 'DC diode HV' : 'DC supply';
-    const outgoing = method === 'rf'
-      ? `<path class="voltage-wire" d="M300 ${y + 20}V416h109m13 0h75v-${416 - yTop}h6m-94 41v20m13-20v20"/>`
-      : `<path class="voltage-wire" d="M300 ${y + 20}V416h197v-${416 - yTop}h6"/>`;
-    source = `${outgoing}
-      ${supply(503, yBox, title, method === 'rf' ? '~ 13.56 MHz' : config.diode ? '−2.5 kV' : '− cathode', method === 'rf' ? '0 V return' : '+ return', 'voltage')}
-      ${terminal(398, y + 5, '−')}`;
+    const rf = method === 'rf';
+    const route = rf ? 'H442M454 425H530V396M442 417v16M454 417v16' : 'H530V396';
+    source = `${floorFeedthrough(384)}
+      <path class="voltage-wire" d="M376 ${y + 6}h8V${rf ? 425 : 416}${route}"/>
+      ${supply(503, yBox, title, rf ? '~ RF' : config.arc ? '− cathode' : '− target', rf ? '0 V' : '+ return',
+        {earthReturn:true,rating:rf ? '13.56 MHz' : config.diode ? '−2.5 kV' : ''})}`;
   } else if (method === 'ebeam') {
-    source = `<path class="voltage-wire" d="M400 ${y + 25}V416h97v-${416 - yTop}h6"/>
-      <path class="ground-wire" d="M300 ${y + 15}v32"/>${earth(300, y + 47)}
-      ${supply(503, yBox, 'E-beam HV', '− gun', '+ hearth', 'voltage')}
-      ${terminal(413, y + 17, '−')}`;
+    source = `${floorFeedthrough(400)}
+      <path class="voltage-wire" d="M400 ${y + 33}V416H530V396"/>
+      <path class="ground-wire" d="M300 ${y + 17}V417"/>${earth(300,417)}
+      ${supply(503,yBox,'E-beam HV','− gun','+ return',{earthReturn:true})}`;
   } else {
-    const offset = method === 'radiant' ? 26 : 15;
-    source = `<path class="heat-wire" d="M356 ${y + offset}V416h174v-20M244 ${y + offset}V430h334v-34"/>
-      ${supply(503, yBox, preclean ? 'Heater off' : 'Heater DC', '+ lead', '− lead', 'heat', '', 'bottom')}`;
+    const offset = method === 'radiant' ? 26 : method === 'filament' ? 15 : 17;
+    source = `${floorFeedthrough(244)}${floorFeedthrough(356)}
+      <path class="heat-wire" d="M356 ${y + offset}V416H530V396M244 ${y + offset}V430H580V396"/>
+      ${supply(503,yBox,preclean ? 'Heater off' : 'Heater DC','+ lead','− lead',{type:'heat'})}`;
   }
   const gun = config.ibad
-    ? `<path class="voltage-wire" d="M108 242h34l14 15"/><path class="ground-wire" d="M108 268h31"/>${earth(139, 268)}
-       <g class="supply voltage"><rect x="9" y="218" width="99" height="67" rx="8"/><text class="supply-title" x="20" y="239">Ar⁺ gun</text><text x="20" y="260">+ source</text><text x="20" y="277">0 V grid</text></g>`
+    ? `<path class="voltage-wire" d="M108 250h40l10 7M108 272h22v18h63v-21"/>
+       <g class="supply voltage"><rect x="9" y="219" width="99" height="71" rx="8"/>
+         <text class="supply-title" x="20" y="236">Ar⁺ gun</text><text x="20" y="254">+ Beam</text><text x="20" y="276">− Accel. grid</text>
+         <circle cx="108" cy="250" r="3.4"/><circle cx="108" cy="272" r="3.4"/><circle cx="31" cy="290" r="3.4"/>
+       </g><path class="ground-wire" d="M31 294v3"/>${earth(31,297)}`
     : '';
   return `${biased ? bias : groundedSubstrate}${lid}${shell}${source}${gun}`;
 }
@@ -118,11 +131,11 @@ function holderMarkup(wafer) {
     <text x="113" y="55" class="holder-controller">Holder heat</text>
     <text x="178" y="55" class="holder-controller">~</text>
     <rect x="158" y="65" width="29" height="18" rx="3" fill="#36506b" stroke="#9bb6d9"/>
-    <path class="holder-wires" d="M165 63v33h53v20h13M180 63v27h63v20"/>
     <path d="M300 82v28" fill="none" stroke="#9bb6d9" stroke-width="6" stroke-linecap="round"/>
     <rect x="189" y="109" width="222" height="19" rx="4" fill="url(#steel)" stroke="#bed0df"/>
     <path d="M195 113h210M195 124h210" fill="none" stroke="#ddeaf4" stroke-opacity=".28"/>
-    <rect x="226" y="111" width="149" height="10" rx="3" fill="#283142" stroke="#b3a27e"/>
+    <rect x="224" y="111" width="153" height="10" rx="3" fill="#283142" stroke="#b3a27e"/>
+    <path class="holder-wires" d="M165 63v41h53v11h10M180 63v26h198v26h-6"/>
     <path d="${element}" fill="none" stroke="#a7977e" stroke-width="1.6"/>
     <path id="holder-coil" d="${element}" fill="none" stroke="#ffc275" stroke-width="2.7" opacity="0"/>
     <path d="M194 124h17v5h-8v6h-6v-8h-3Zm212 0h-17v5h8v6h6v-8h3Z" fill="#8196ae" stroke="#bccde2"/>
@@ -171,24 +184,33 @@ function sourceMarkup(config, method, y, colour) {
   if (config.family === 'sputtering') {
     return `<path d="M232 ${y + 8}h136l-13 30h-110Z" fill="#243956" stroke="#6986ab"/>
       ${config.magnetron ? magnetronField(y) : ''}
-      <rect x="224" y="${y}" width="152" height="10" rx="2" fill="${colour}" stroke="#c1cfe0"/>`;
+      <rect x="224" y="${y}" width="152" height="10" rx="2" fill="${colour}" stroke="#c1cfe0"/>
+      ${electricalContact(376,y+6,'voltage',method === 'rf' ? 'RF feed to target' : 'Target cathode feed')}`;
   }
   if (config.arc) {
     return `<path d="M243 ${y + 9}h114v17H243Z" fill="#30465e" stroke="#728dae"/>
       <rect x="224" y="${y}" width="152" height="11" rx="2" fill="${colour}" stroke="#c1cfe0"/>
+      ${electricalContact(376,y+6,'voltage','Arc cathode feed')}
       <path class="ground-wire" d="M450 ${y - 45}h30"/>
       <path d="M450 ${y - 66}v45" stroke="#8ca9ce" stroke-width="5"/>
-      ${annotation('Anode 0 V', 446, y - 73, `M448 ${y - 70}l2 9`, { anchor: 'end' })}`;
+      ${electricalContact(450,y-45,'ground','Arc anode return')}
+      ${annotation('Arc anode · 0 V', 446, y - 73, `M448 ${y - 70}l2 9`, { anchor: 'end' })}`;
   }
   if (method === 'filament') {
     const coil = `M244 ${y + 15}v-10h12l10-9 12 13 13-13 13 13 13-13 13 13 13-9h13v15`;
     return `<path d="${coil}" fill="none" stroke="#8fa3b5" stroke-width="5" stroke-linejoin="round"/>
-      <path class="heat-active" d="${coil}" fill="none" stroke="#ffc47d" stroke-width="4" stroke-linejoin="round" opacity="0"/>`;
+      <path class="heat-active" d="${coil}" fill="none" stroke="#ffc47d" stroke-width="4" stroke-linejoin="round" opacity="0"/>
+      ${electricalContact(244,y+15,'heat','Filament negative lead')}${electricalContact(356,y+15,'heat','Filament positive lead')}`;
   }
   const heater = method === 'radiant' ? `<path d="M244 ${y + 26}h112" stroke="#8598af" stroke-width="4" stroke-dasharray="6 4"/>
-    <path class="heat-active" d="M244 ${y + 26}h112" stroke="#ffc47d" stroke-width="4" stroke-dasharray="6 4" opacity="0"/>` : '';
+    <path class="heat-active" d="M244 ${y + 26}h112" stroke="#ffc47d" stroke-width="4" stroke-dasharray="6 4" opacity="0"/>
+    ${electricalContact(244,y+26,'heat','Radiant heater negative lead')}${electricalContact(356,y+26,'heat','Radiant heater positive lead')}`
+    : method === 'ebeam' ? electricalContact(300,y+17,'ground','Grounded hearth')
+    : `<path d="M244 ${y + 17}h112" stroke="#a8b7c8" stroke-width="3"/>
+      ${electricalContact(244,y+17,'heat','Heater negative lead')}${electricalContact(356,y+17,'heat','Heater positive lead')}`;
   const gun = method === 'ebeam'
     ? `<rect x="386" y="${y + 19}" width="26" height="14" rx="3" fill="#5b6d84" stroke="#aabeD4"/>
+       ${electricalContact(400,y+33,'voltage','Negative electron emitter')}
        <path id="electron-guide" d="M399 ${y + 19}Q396 ${y - 60} 306 ${y - 1}" fill="none" stroke="#f3b77f" stroke-width="1.7" opacity="0"/>`
     : '';
   return `<path d="M236 ${y}h128l-15 17h-98Z" fill="#4a627e" stroke="#a5b8d2"/>
@@ -206,10 +228,10 @@ export function chamberMarkup(config, method, settings, material, film) {
   const plasmaY = config.classic ? 175 : config.diode ? y - 99 : y - 52;
   const preclean = config.classic && settings.preclean;
   const substrate = config.classic || config.arc ? 'Negatively biased substrate' : 'Substrate holder at ground';
-  const supply = method === 'rf' ? 'RF supply through a blocking capacitor to the target, with negative DC self-bias'
+  const supply = method === 'rf' ? 'RF supply through a blocking capacitor to the target, with negative DC self-bias and a 0 V return'
     : method === 'ebeam' ? 'High voltage from the negative gun to the grounded hearth'
     : config.arc || config.family === 'sputtering' ? 'Negative cathode with a grounded positive return'
-    : config.ibad ? 'DC heater and ion gun with positive source and grounded extraction grid' : 'DC heater with positive and negative leads';
+    : config.ibad ? 'DC heater and simplified ion gun with positive beam potential and negative accelerator grid' : 'DC heater with positive and negative leads';
   const field = config.magnetron ? ' Permanent magnets and magnetic field B.' : '';
   return `<svg viewBox="0 0 620 465" role="img" aria-label="${config.hardware}. ${wafer.label} on a holder with an independent resistance heater. ${substrate}. ${supply}.${field}${preclean ? ' The evaporation source heater is off for plasma pre-cleaning.' : ''}">
     <defs>
@@ -239,7 +261,9 @@ export function chamberMarkup(config, method, settings, material, film) {
     ${chamberSensors(hasPlasma)}
     ${gas ? gasInlet(gas) : ''}
     ${sourceMarkup(config, method, y, material.colour)}
-    ${config.ibad ? '<path d="m144 265 37-21 13 24-37 21Z" fill="#6c829f" stroke="#c2ace3"/><path d="m179 245 14 24" stroke="#c2ace3" stroke-width="2"/>' : ''}
+    ${config.ibad ? `<path d="m144 265 37-21 13 24-37 21Z" fill="#6c829f" stroke="#c2ace3"/>
+      <path d="m175 248 13 23m-8-26 13 24" stroke="#c2ace3" stroke-width="2"/>
+      ${electricalContact(158,257,'voltage','Positive beam supply')}${electricalContact(193,269,'voltage','Negative acceleration grid')}` : ''}
     <foreignObject x="0" y="0" width="620" height="465" clip-path="url(#chamber-interior)" pointer-events="none">
       <canvas xmlns="http://www.w3.org/1999/xhtml" id="chamber-motion" width="1240" height="930"></canvas>
     </foreignObject>
@@ -247,7 +271,7 @@ export function chamberMarkup(config, method, settings, material, film) {
     <text class="chamber-label minor" x="453" y="${(y + 146) / 2}" text-anchor="end">L</text>
     ${annotation('To pump', 16, pumpY + 42, `M65 ${pumpY + 37}l12-15`)}
     ${annotation('Substrate holder', 133, 156, 'M164 144l26-27')}
-    ${annotation('Substrate', 318, 92, 'M431 94v18l-33 20', { detail: wafer.label })}
+    ${annotation('Substrate', 391, 190, 'M396 186h12v-35l-10-19', { detail: wafer.label, anchor: 'end' })}
     ${annotation('TC', 266, 96, 'M270 96l11 12', { anchor: 'end' })}
     ${annotation('QCM', 439, 184, 'M439 172v-11', { anchor: 'middle' })}
     ${hasPlasma ? annotation('OES', 465, 204, 'M468 198l5-7', { anchor: 'end' }) : ''}
@@ -255,7 +279,7 @@ export function chamberMarkup(config, method, settings, material, film) {
       ? annotation(config.arc ? 'Ti cathode' : 'Target', 150, y + 5, `M200 ${y + 1}l24 4`, { detail: method === 'rf' ? '− self-bias' : config.ito === 'ceramic' ? 'ITO ceramic' : config.ito ? 'In–Sn alloy' : '' })
       : annotation(method === 'ebeam' ? 'Hearth' : 'Source', 151, y + 7, `M205 ${y + 3}l${method === 'filament' ? 39 : 31} 2`)}
     ${method === 'ebeam' ? annotation('E-gun', 427, y + 31, `M423 ${y + 28}h-11`) : ''}
-    ${config.ibad ? annotation('Ion gun', 130, 300, 'M159 289l11-12') : ''}
+    ${config.ibad ? annotation('Ion gun', 207, 308, 'M211 294l-25-20') : ''}
     ${product ? `<g id="in-chamber-film-label" visibility="hidden">${annotation(`${product} film`, 330, 174, 'M327 165l-18-27')}</g>` : ''}
     <g id="film-grain-inset" visibility="hidden">
       <rect x="502" y="158" width="106" height="136" rx="7" fill="#1e334d" stroke="#89aaca"/>

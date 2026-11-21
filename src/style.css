@@ -179,22 +179,24 @@ select {
 #chamber-motion { display: block; width: 100%; height: 100%; }
 .chamber-label { fill: #d3e2f5; font: 16px system-ui, sans-serif; }
 .chamber-label.minor { font-size: 13px; }
-.ground-wire, .voltage-wire, .heat-wire, .feedthrough path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ground-wire, .voltage-wire, .heat-wire { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ground-wire { stroke: #91b6d2; }
 .voltage-wire { stroke: #c5a5ef; }
 .heat-wire { stroke: #e8ab77; }
 .feedthrough rect { fill: #1d344c; stroke: #a4c4e7; }
-.feedthrough path { stroke: #a4c4e7; }
 .magnetic-field { fill: none; stroke: #f0bf77; stroke-opacity: .9; stroke-width: 1.6; stroke-dasharray: 4 4; }
 .magnetic-field .field-arrow { stroke-dasharray: none; stroke-width: 1.8; }
 .magnetron-pole { fill: #ffda99; font: 690 14px system-ui, sans-serif; }
 .magnetron-pole { fill: #f3f5fd; }
-.supply, .terminal { fill: #dfc5ff; stroke: #a58ac9; }
+.supply { fill: #dfc5ff; stroke: #a58ac9; }
 .supply.heat { fill: #ffcd9d; stroke: #d49f72; }
-.supply rect, .terminal circle { fill: #1b2d49; }
+.supply rect { fill: #1b2d49; }
 .supply text { stroke: none; font: 14px system-ui, sans-serif; }
 .supply .supply-title { font-weight: 690; }
-.terminal text { fill: #ead9ff; stroke: none; font: 18px system-ui, sans-serif; }
+.supply .terminal-caption { font-size: 11.5px; }
+.electrical-node { fill: #c5a5ef; stroke: #14253d; stroke-width: .8; }
+.electrical-node.ground { fill: #91b6d2; }
+.electrical-node.heat { fill: #e8ab77; }
 .legend { display: flex; gap: .75rem; align-items: center; justify-content: center; flex-wrap: wrap; color: var(--muted); font-size: .8rem; }
 .legend span { display: inline-flex; align-items: center; gap: .27rem; white-space: nowrap; }
 .legend i { width: .56rem; height: .56rem; display: inline-grid; place-content: center; border-radius: 50%; background: var(--plot); }

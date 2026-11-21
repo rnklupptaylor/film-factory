@@ -18,7 +18,8 @@ test('roughness, incomplete coverage and pores each reduce the modelled gloss', 
   const profile = [84, 100, 84];
   const finish = (changes) => lightboxFilmAppearance(profile, { roughnessNm: .25, coverage: 1, voidFraction: 0, ...changes });
   const polished = finish({});
-  assert.ok(polished.roughness < .1);
+  assert.ok(polished.roughness < .02);
+  assert.ok(finish({ roughnessNm: .7 }).roughness < .025);
   assert.ok(finish({ roughnessNm: 40 }).roughness > .7);
   assert.ok(finish({ coverage: .4 }).roughness > polished.roughness);
   assert.ok(finish({ voidFraction: .5 }).roughness > polished.roughness);
