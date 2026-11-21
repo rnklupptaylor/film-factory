@@ -1,22 +1,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chamberMarkup, CHAMBER, sourceLevel } from '../src/chamber.mjs';
-import { newSettings, VARIANTS } from '../src/content.mjs';
+import { newSettings, TECHNIQUES, VARIANTS } from '../src/content.mjs';
 import { MATERIALS, rates } from '../src/physics.mjs';
 import { ChamberTransport, displayFreePath } from '../src/transport.mjs';
 
-function scene(method) {
+function scene(method, overrides = {}) {
   let seed = 7521;
   const motion = new ChamberTransport(() => {
     seed = (1664525 * seed + 1013904223) >>> 0;
     return seed / 2 ** 32;
   });
   const config = VARIANTS[method];
-  const settings = newSettings(method);
+  const settings = { ...newSettings(method), ...overrides };
   const material = MATERIALS[settings.symbol];
   const sample = rates(config, settings, material);
-  const step = (active, frames, reduced = false) => {
-    for (let i = 0; i < frames; i++) motion.update(1 / 60, active, config, method, settings, sample, material.mass, 3, reduced);
+  const step = (active, frames, reduced = false, thickness = 3, residue = 0) => {
+    for (let i = 0; i < frames; i++) motion.update(1 / 60, active, config, method, settings, sample, material.mass, thickness, reduced, residue);
   };
   return { motion, config, settings, material, sample, step };
 }
@@ -28,6 +28,36 @@ test('neutral transport responds to pressure and moves away from an evaporation 
   assert.ok(boat.motion.particles.length > 10);
   assert.ok(boat.motion.particles.every((p) => p.kind === 'atom' && p.vy <= 0));
   assert.ok(boat.motion.particles.some((p) => p.y < sourceLevel(boat.settings.distance) - 25));
+});
+
+test('the default DC diode operates without magnets and magnetron diagrams show poles and field', () => {
+  assert.equal(TECHNIQUES.sputtering.options[0], 'diode');
+  for (const method of TECHNIQUES.sputtering.options) {
+    const { config, settings, material, sample } = scene(method);
+    const diagram = chamberMarkup(config, method, settings, material, sample.film);
+    if (method === 'diode') {
+      assert.doesNotMatch(diagram, /class="magnetron"|Magnetic field B/);
+      assert.match(diagram, /−2.5 kV/);
+      assert.ok(10 ** settings.pressure * 100 >= 2 && 10 ** settings.pressure * 100 <= 4);
+    } else {
+      assert.match(diagram, /Magnetic field B/);
+      assert.match(diagram, /class="magnetron-pole"[^>]+>N</);
+      assert.match(diagram, /class="magnetron-pole"[^>]+>S</);
+    }
+  }
+});
+
+test('Ar⁺ pre-cleaning runs with plasma and residue tracers but with no heater or vapour', () => {
+  const clean = scene('classic', { preclean: true });
+  clean.step(true, 90, false, 0, 1);
+  assert.ok(clean.motion.power.plasma > 0);
+  assert.equal(clean.motion.power.heat, 0);
+  assert.ok(clean.motion.particles.some((p) => p.kind === 'argon'));
+  assert.ok(clean.motion.particles.some((p) => p.kind === 'removed'));
+  assert.ok(clean.motion.particles.every((p) => p.kind !== 'atom'));
+  const diagram = chamberMarkup(clean.config, 'classic', clean.settings, clean.material, clean.sample.film);
+  assert.match(diagram, /Heater off/);
+  assert.match(diagram, /id="surface-residue"/);
 });
 
 test('sputtering emits neutrals after target impact and IBAD ions start at the independent gun', () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MATERIALS, POSITIONS, advanceFilm, meanFreePath, rates, sputterYield, vapourPressure } from '../src/physics.mjs';
+import { MATERIALS, POSITIONS, advanceFilm, meanFreePath, rates, residueAfter, sputterYield, vapourPressure } from '../src/physics.mjs';
 import { VARIANTS, controlGroups, newSettings } from '../src/content.mjs';
 
 const check = (id, patch = {}) => {
@@ -49,6 +49,20 @@ test('ion bombardment can overcome growth and removes existing film without nega
   assert.ok(advanceFilm(grown, etch, .1)[20] < grown[20]);
   assert.deepEqual(advanceFilm(grown, etch, 60), empty);
   assert.equal(check('ibad', {bias: 200}).ionEnergy, 200);
+});
+
+test('classic pre-cleaning turns off deposition and clears exposed residue only with sufficient ion flux and energy', () => {
+  const clean = check('classic', { preclean: true });
+  assert.equal(clean.gross, 0);
+  assert.ok(clean.loss > 0);
+  assert.ok(clean.cleanRate > 0);
+  assert.equal(residueAfter(1, check('classic'), 30), 1);
+  assert.equal(residueAfter(1, check('classic', { preclean: true, ionCurrent: 0 }), 30), 1);
+  assert.equal(residueAfter(1, check('classic', { preclean: true, bias: 0 }), 30), 1);
+  assert.equal(residueAfter(1, clean, 30, clean.loss * 40), 1);
+  assert.ok(Math.abs(residueAfter(1, clean, 30, clean.loss * 10) - residueAfter(1, clean, 20)) < 1e-12);
+  assert.ok(residueAfter(1, clean, 30) < .20);
+  assert.deepEqual(advanceFilm(POSITIONS.map(() => 0), clean, 30), POSITIONS.map(() => 0));
 });
 
 test('every selectable preset and control limit produces finite nonnegative flux', () => {

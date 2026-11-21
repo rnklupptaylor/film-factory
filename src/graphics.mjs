@@ -61,7 +61,7 @@ export function profilePlot(current, forecast) {
     yDomain: [0, Math.max(.02, ...current, ...forecast) * 1.13], lines: [{points: projected, dashed: true}, {points: measured}] });
 }
 
-export function sectionMarkup(shape, h, colour) {
+export function sectionMarkup(shape, h, colour, bareLabel = 'Bare substrate · run the deposition') {
   const base = 214;
   const height = clamp(19 * Math.log10(1 + h * 4), 4, 109);
   const top = base - height;
@@ -86,7 +86,7 @@ export function sectionMarkup(shape, h, colour) {
     <text class="major" x="25" y="28">${shape.name}</text>
     <path d="M35 83V230M355 83V230" stroke="var(--grid)" stroke-dasharray="4 5"/>
     <rect x="35" y="${base}" width="320" height="29" rx="3" fill="var(--substrate)"/>
-    ${h > .0001 ? (shape.type === 'plain' ? `<rect x="35" y="${top}" width="320" height="${height}" fill="${colour}"/>` : grains) : '<text x="195" y="163" text-anchor="middle">Bare substrate · run the deposition</text>'}
+    ${h > .0001 ? (shape.type === 'plain' ? `<rect x="35" y="${top}" width="320" height="${height}" fill="${colour}"/>` : grains) : `<text x="195" y="163" text-anchor="middle">${bareLabel}</text>`}
     <text x="195" y="267" text-anchor="middle">Substrate · schematic cross-section</text>
     <text x="35" y="57">Centre thickness ${decimal(h)} nm</text>
   </svg>`;

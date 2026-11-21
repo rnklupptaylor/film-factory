@@ -29,7 +29,7 @@ function terminal(x, y, sign, type = 'voltage') {
   return `<g class="terminal ${type}"><circle cx="${x}" cy="${y}" r="10"/><text x="${x}" y="${y + 5.2}" text-anchor="middle">${sign}</text></g>`;
 }
 
-function circuitMarkup(config, method, y) {
+function circuitMarkup(config, method, y, preclean) {
   const biased = config.classic || config.arc;
   const groundedSubstrate = `<path class="ground-wire" d="M300 81V51h-67"/>${earth(233, 51)}
     <text class="chamber-label minor" x="202" y="58">0 V</text>`;
@@ -39,19 +39,19 @@ function circuitMarkup(config, method, y) {
     ${terminal(410, 128, '−')}`;
   const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/><path d="M300 64v54"/></g>`;
   const shell = `<path class="ground-wire" d="M105 348H83"/>${earth(83, 348)}
-    <text class="chamber-label minor" x="9" y="354">Wall 0 V</text>`;
+    <text class="chamber-label minor" x="9" y="354">${config.diode ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
   const yBox = 326;
   const yTop = yBox + 39;
   const yBottom = yBox + 58;
   let source;
   if (config.family === 'sputtering' || config.arc) {
-    const title = method === 'rf' ? 'RF supply' : method === 'pulsed' ? 'Pulsed DC' : config.arc ? 'Arc supply' : 'DC supply';
+    const title = method === 'rf' ? 'RF supply' : method === 'pulsed' ? 'Pulsed DC' : config.arc ? 'Arc supply' : config.diode ? 'DC diode HV' : 'DC supply';
     const outgoing = method === 'rf'
       ? `<path class="voltage-wire" d="M300 ${y + 20}V416h109m13 0h62v-${416 - yTop}h19m-94 41v20m13-20v20"/>`
       : `<path class="voltage-wire" d="M300 ${y + 20}V416h184v-${416 - yTop}h19"/>`;
     const targetLabel = method === 'rf' ? '− self-bias' : config.arc ? '− Ti cathode' : '− target';
     source = `${outgoing}<path class="ground-wire" d="M503 ${yBottom}h-9"/>${earth(494, yBottom)}
-      ${supply(503, yBox, title, method === 'rf' ? '~ 13.56 MHz' : '− cathode', method === 'rf' ? '0 V return' : '+ return', 'voltage')}
+      ${supply(503, yBox, title, method === 'rf' ? '~ 13.56 MHz' : config.diode ? '−2.5 kV' : '− cathode', method === 'rf' ? '0 V return' : '+ return', 'voltage')}
       <text class="electrode-label" x="386" y="${y + 9}">${targetLabel}</text>`;
   } else if (method === 'ebeam') {
     source = `<path class="voltage-wire" d="M400 ${y + 25}V416h84v-${416 - yTop}h19"/>
@@ -61,7 +61,7 @@ function circuitMarkup(config, method, y) {
   } else {
     const offset = method === 'radiant' ? 26 : 15;
     source = `<path class="heat-wire" d="M356 ${y + offset}V414h127v-${414 - yTop}h20M244 ${y + offset}V428h250v-${428 - yBottom}h9"/>
-      ${supply(503, yBox, 'Heater DC', '+ lead', '− lead', 'heat')}`;
+      ${supply(503, yBox, preclean ? 'Heater off' : 'Heater DC', '+ lead', '− lead', 'heat')}`;
   }
   const gun = config.ibad
     ? `<path class="voltage-wire" d="M108 242h34l14 15"/><path class="ground-wire" d="M108 268h31"/>${earth(139, 268)}
@@ -70,13 +70,29 @@ function circuitMarkup(config, method, y) {
   return `${biased ? bias : groundedSubstrate}${lid}${shell}${source}${gun}`;
 }
 
+function magnetronField(y) {
+  const poles = [[240, 'S', '#385777'], [285, 'N', '#854452'], [330, 'S', '#385777']];
+  const magnets = poles.map(([x, pole, fill]) => `<rect x="${x}" y="${y + 13}" width="30" height="19" rx="3" fill="${fill}" stroke="#a8bcd1"/>
+    <text class="magnetron-pole" x="${x + 15}" y="${y + 27}" text-anchor="middle">${pole}</text>`).join('');
+  return `<g class="magnetron">
+    <g class="magnetic-field">
+      <path d="M296 ${y - 1}C291 ${y - 50} 266 ${y - 61} 254 ${y - 47}S242 ${y - 18} 244 ${y - 1}"/>
+      <path d="M304 ${y - 1}C309 ${y - 50} 334 ${y - 61} 346 ${y - 47}S358 ${y - 18} 356 ${y - 1}"/>
+      <path d="M292 ${y - 1}C288 ${y - 29} 278 ${y - 41} 267 ${y - 37}S251 ${y - 17} 253 ${y - 1}"/>
+      <path d="M308 ${y - 1}C312 ${y - 29} 322 ${y - 41} 333 ${y - 37}S349 ${y - 17} 347 ${y - 1}"/>
+      <path class="field-arrow" d="M266 ${y - 54}l-9 5m5-7l-5 7 9-1m68-4l9 5m-5-7l5 7-9-1"/>
+    </g>
+    ${magnets}
+    <path d="M245 ${y + 35}h110" stroke="#6986ab" stroke-width="3"/>
+    <text class="field-label" x="300" y="${y - 64}" text-anchor="middle">Magnetic field B</text>
+    <text class="chamber-label minor" x="221" y="${y + 28}" text-anchor="end">Magnetron</text>
+  </g>`;
+}
+
 function sourceMarkup(config, method, y, colour) {
   if (config.family === 'sputtering') {
-    return `<path d="M237 ${y + 8}h126l-13 22h-100Z" fill="#243956" stroke="#6986ab"/>
-      <path class="magnetic-field" d="M250 ${y}q12-69 49 0q28-69 49 0"/>
-      <rect x="246" y="${y + 13}" width="20" height="11" rx="2" fill="#845567"/>
-      <rect x="290" y="${y + 13}" width="20" height="11" rx="2" fill="#44678b"/>
-      <rect x="334" y="${y + 13}" width="20" height="11" rx="2" fill="#845567"/>
+    return `<path d="M232 ${y + 8}h136l-13 30h-110Z" fill="#243956" stroke="#6986ab"/>
+      ${config.magnetron ? magnetronField(y) : ''}
       <rect x="224" y="${y}" width="152" height="10" rx="2" fill="${colour}" stroke="#c1cfe0"/>`;
   }
   if (config.arc) {
@@ -106,13 +122,15 @@ export function chamberMarkup(config, method, settings, material, film) {
   const y = sourceLevel(settings.distance);
   const gas = config.family === 'sputtering' || config.classic || config.arc;
   const gasLabel = config.arc ? 'N₂' : config.reactive ? 'Ar + N₂' : 'Ar';
-  const plasmaY = config.classic ? 175 : config.arc ? y - 52 : y - 41;
+  const plasmaY = config.classic ? 175 : config.diode ? y - 99 : y - 52;
+  const preclean = config.classic && settings.preclean;
   const substrate = config.classic || config.arc ? 'Negatively biased substrate' : 'Substrate holder at ground';
   const supply = method === 'rf' ? 'RF supply through a blocking capacitor to the target, with negative DC self-bias'
     : method === 'ebeam' ? 'High voltage from the negative gun to the grounded hearth'
     : config.arc || config.family === 'sputtering' ? 'Negative cathode with a grounded positive return'
     : config.ibad ? 'DC heater and ion gun with positive source and grounded extraction grid' : 'DC heater with positive and negative leads';
-  return `<svg viewBox="0 0 620 465" role="img" aria-label="${config.hardware}. ${substrate}. ${supply}.">
+  const field = config.magnetron ? ' Permanent magnets and magnetic field B.' : '';
+  return `<svg viewBox="0 0 620 465" role="img" aria-label="${config.hardware}. ${substrate}. ${supply}.${field}${preclean ? ' The heater is off for plasma pre-cleaning.' : ''}">
     <defs>
       <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" stroke="#718aa9" stroke-opacity=".20"/></pattern>
       <radialGradient id="plasma"><stop stop-color="#b997ff" stop-opacity=".68"/><stop offset="1" stop-color="#9d6dec" stop-opacity="0"/></radialGradient>
@@ -129,12 +147,15 @@ export function chamberMarkup(config, method, settings, material, film) {
     <rect x="106" y="68" width="386" height="342" rx="37" fill="#314b68" stroke="#94afd1" stroke-width="2"/>
     <rect x="119" y="81" width="360" height="316" rx="27" fill="#122137" stroke="#6b8aac" stroke-width="2"/>
     <g clip-path="url(#chamber-interior)">
-      ${gas ? `<ellipse id="plasma-glow" cx="300" cy="${plasmaY}" rx="${config.arc ? 115 : 149}" ry="${config.classic ? 100 : 63}" fill="url(#plasma)" opacity="0"/>` : ''}
+      ${gas ? `<g id="plasma-glow" fill="url(#plasma)" opacity="0">${config.magnetron
+        ? `<ellipse cx="263" cy="${y - 25}" rx="70" ry="38"/><ellipse cx="337" cy="${y - 25}" rx="70" ry="38"/>`
+        : `<ellipse cx="300" cy="${plasmaY}" rx="${config.diode ? 181 : config.arc ? 115 : 149}" ry="${config.diode ? 120 : config.classic ? 100 : 63}"/>`}</g>` : ''}
       ${config.family !== 'sputtering' && !config.arc ? `<ellipse class="heat-active" cx="300" cy="${y + (method === 'radiant' ? 17 : 1)}" rx="96" ry="45" fill="url(#heat)" opacity="0"/>` : ''}
     </g>
-    ${circuitMarkup(config, method, y)}
+    ${circuitMarkup(config, method, y, preclean)}
     <path d="M300 82v35m-106 0h212" fill="none" stroke="#9bb6d9" stroke-width="5" stroke-linecap="round"/>
     <rect x="202" y="121" width="196" height="14" rx="3" fill="url(#steel)" stroke="#becde0"/>
+    ${config.classic ? '<path id="surface-residue" d="M203 137h194" stroke="#f4b280" stroke-width="3.5" stroke-dasharray="2 3" stroke-linecap="round"/>' : ''}
     <rect id="in-chamber-film" x="202" y="135" width="196" height="0" rx="2" fill="${film.colour}"/>
     <text class="chamber-label" x="320" y="104">Substrate</text>
     ${gas ? `<path d="M61 207h63" stroke="#ab92d4" stroke-width="2" stroke-dasharray="4 4"/><text class="chamber-label gas-label" x="12" y="200">${gasLabel}</text>` : ''}

@@ -10,8 +10,8 @@ Film Factory is a teaching app on thin film processing at FAU Erlangen-Nürnberg
 ## In The Atom Shop
 
 - **Evaporation** includes direct and indirect resistance heating, electron beam heating and radiation heating. Vary source temperature, pressure, distance and substrate temperature.
-- **Sputtering** includes DC, pulsed DC, RF at 13.56 MHz and reactive Ti magnetron sputtering. Compare Ar⁺ yields, pressure, duty cycle and nitrogen-induced target poisoning.
-- **Ion plating** includes classic plasma-based plating, arc ion plating of TiN and ion beam assisted deposition. Compare deposition and resputtering at different bias and ion current.
+- **Sputtering** opens with conventional DC diode sputtering. Compare it with DC, pulsed DC, RF at 13.56 MHz and reactive Ti magnetrons. The chamber shows the magnet poles and magnetic field B for the magnetron methods.
+- **Ion plating** includes classic plasma-based plating, arc ion plating of TiN and ion beam assisted deposition. Use **Pre-clean** in classic ion plating to turn off the coating source while Ar⁺ removes modelled surface residue. Switch to **Deposit** to grow a film on the prepared substrate.
 - **Film and plots** show the growth history and projected thickness, the thickness profile across a 100 mm wafer, the source response and a schematic film cross-section. The 60 s runs play at 5× and preserve the effect of earlier slider changes.
 - **Chamber** shows free flights, collisions and ion impacts with labelled supplies and electrodes. Plasma and hot-source glow fade when a run pauses, resets or finishes. Particle flight, pulse and cooldown times are scaled for viewing.
 

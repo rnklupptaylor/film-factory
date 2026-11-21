@@ -61,6 +61,7 @@ export function rates(config, settings, material) {
   const transmission = 1 / (1 + gap / (8 * lambda));
   const geometry = 1 / (Math.PI * gap ** 2);
   let gross, loss = 0, vapour, yieldValue, ionEnergy, ionDose, poisoning, film = material;
+  let cleanRate = 0;
 
   if (config.family === 'evaporation') {
     vapour = vapourPressure(material, settings.temperature);
@@ -95,6 +96,13 @@ export function rates(config, settings, material) {
       ? .45 * sputterYield(MATERIALS.Ti, ionEnergy)
       : sputterYield(material, Math.min(600, ionEnergy));
     loss = thicknessRate(ionFlux * equivalentYield, film);
+    if (config.classic && settings.preclean) {
+      gross = 0;
+      // Illustrative surface residue index. This scale is not a measured
+      // cleaning rate for an oxide, contaminant, or particular substrate.
+      const effectiveness = Math.min(1, Math.max(0, (ionEnergy - 30) / 270));
+      cleanRate = effectiveness * (ionFlux / 1e4) / 6e15;
+    }
     ionDose = gross > 0 ? ionEnergy * ionFlux * volumePerParticle(film) * 1e9 / gross : 0;
   }
 
@@ -105,7 +113,12 @@ export function rates(config, settings, material) {
     const scattered = config.family === 'evaporation' ? direct : .88 + .12 * direct;
     return gross * (direct * ballistic + scattered * (1 - ballistic));
   });
-  return { gross, loss, net: gross - loss, localGross, vapour, yieldValue, ionEnergy, ionDose, poisoning, lambda, ballistic, film, theta };
+  return { gross, loss, net: gross - loss, localGross, vapour, yieldValue, ionEnergy, ionDose, poisoning, lambda, ballistic, film, theta, cleanRate };
+}
+
+export function residueAfter(fraction, sample, seconds, filmAtCentre = 0) {
+  const delay = filmAtCentre > 0 ? filmAtCentre / sample.loss : 0;
+  return fraction * Math.exp(-sample.cleanRate * Math.max(0, seconds - delay));
 }
 
 export function advanceFilm(thickness, sample, seconds) {

@@ -74,10 +74,11 @@
       <button type="button" data-mobile="chamber" aria-pressed="true">Chamber</button>
       <button type="button" data-mobile="plots" aria-pressed="false">Plots</button>
       <button id="compact-guide" type="button">Try it</button>
+      <button id="compact-preclean" type="button" hidden>Pre-clean</button>
     </nav>
     <div class="workspace" id="workspace" data-mobile="chamber">
       <section class="panel controls" aria-labelledby="controls-title">
-        <div class="panel-header"><h2 id="controls-title">Process settings</h2><button id="guide" class="button" type="button">Try it</button></div>
+        <div class="panel-header"><h2 id="controls-title">Process settings</h2><div class="control-actions"><button id="preclean" class="button" type="button" hidden>Pre-clean</button><button id="guide" class="button" type="button">Try it</button></div></div>
         <div class="selects">
           <label><span>Method</span><select id="variant" aria-label="Method"></select></label>
           <label><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>

@@ -9,7 +9,7 @@ export const TECHNIQUES = {
   sputtering: {
     name: 'Sputtering', question: 'What knocks an atom loose?',
     summary: 'Ar⁺ bombards a cathode target. Ejected atoms travel to the substrate and form a film.',
-    options: ['dc', 'pulsed', 'rf', 'reactive'],
+    options: ['diode', 'dc', 'pulsed', 'rf', 'reactive'],
   },
   plating: {
     name: 'Ion plating', question: 'When do ions help a film grow?',
@@ -23,11 +23,12 @@ export const VARIANTS = {
   filament: { family: 'evaporation', name: 'Direct resistance heating', hardware: 'Directly heated Ti filament', materials: ['Ti'], area: .00012, maxC: 1660, defaults: { temperature: 1860, distance: 15 }, prompt: 'The current passes through Ti itself. Look for appreciable vapour pressure below its melting point.' },
   ebeam: { family: 'evaporation', name: 'Electron beam heating', hardware: 'E-beam hearth', materials: ['Ti','Cr','Au','Cu','Al','Ag'], area: .00024, maxC: 2050, defaults: { distance: 20 }, prompt: 'Switch between Cr and Au. Compare their vapour-pressure curves and the source phase at useful rates.' },
   radiant: { family: 'evaporation', name: 'Radiation heating', hardware: 'Radiant heater and crucible', materials: ['Ag','Al'], area: .00007, maxC: 1250, defaults: { distance: 16 }, prompt: 'Heat reaches the charge from a separate hot filament. Compare the rate at a common T with the boat.' },
-  dc: { family: 'sputtering', name: 'DC magnetron', hardware: 'DC magnetron cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], defaults: { energy: 350, current: .35 }, prompt: 'Double the working pressure at fixed target current and energy. How do λ, rate and thickness profile respond?' },
-  pulsed: { family: 'sputtering', name: 'Pulsed DC magnetron', hardware: 'Pulsed DC cathode', materials: ['Al','Ti','Cu','Cr','Ag','Au'], duty: true, defaults: { energy: 450, current: .42, duty: 70 }, prompt: 'Change the duty cycle while holding the on-current fixed. During the off interval, surface charge can clear.' },
-  rf: { family: 'sputtering', name: 'RF magnetron · 13.56 MHz', hardware: 'RF cathode with DC self-bias', materials: ['SiO2','Al','Ti','Cu'], defaults: { energy: 350, current: .25 }, prompt: 'Select fused silica. RF coupling sustains sputtering of an insulating target. Compare its effective rate with that of a metal.' },
-  reactive: { family: 'sputtering', name: 'Reactive magnetron · Ti + N₂', hardware: 'Reactive Ti cathode', materials: ['Ti'], reactive: true, defaults: { pressure: -1.4, energy: 450, current: .60, nitrogen: 6, substrate: 520 }, prompt: 'Sweep the N₂ fraction across 5–8% at about 4 Pa total pressure. Watch the target coverage rise and the effective yield fall.' },
-  classic: { family: 'plating', name: 'Classic ion plating', hardware: 'Evaporation source', materials: ['Ag','Cu','Al','Ti'], classic: true, defaults: { pressure: -1.45, bias: 1600, ionCurrent: .08, arrival: 2.8 }, prompt: 'Raise ion current until resputtering overtakes incoming deposition. What happens to the film you already grew?' },
+  diode: { family: 'sputtering', name: 'DC diode · conventional', hardware: 'DC diode cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], diode: true, defaults: { pressure: -1.55, energy: 300, current: .06 }, prompt: 'Run the conventional DC diode, then select DC magnetron. Compare the spread of Ar⁺ impacts, working pressure and arrival of sputtered atoms.' },
+  dc: { family: 'sputtering', name: 'DC magnetron', hardware: 'DC magnetron cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], magnetron: true, defaults: { energy: 350, current: .35 }, prompt: 'Trace B from the centre N pole to the outer S poles. Compare the focussed discharge and target impacts with the conventional DC diode.' },
+  pulsed: { family: 'sputtering', name: 'Pulsed DC magnetron', hardware: 'Pulsed DC cathode', materials: ['Al','Ti','Cu','Cr','Ag','Au'], magnetron: true, duty: true, defaults: { energy: 450, current: .42, duty: 70 }, prompt: 'Change the duty cycle while holding the on-current fixed. During the off interval, surface charge can clear.' },
+  rf: { family: 'sputtering', name: 'RF magnetron · 13.56 MHz', hardware: 'RF cathode with DC self-bias', materials: ['SiO2','Al','Ti','Cu'], magnetron: true, defaults: { energy: 350, current: .25 }, prompt: 'Select fused silica. RF coupling sustains sputtering of an insulating target. Compare its effective rate with that of a metal.' },
+  reactive: { family: 'sputtering', name: 'Reactive magnetron · Ti + N₂', hardware: 'Reactive Ti cathode', materials: ['Ti'], magnetron: true, reactive: true, defaults: { pressure: -1.4, energy: 450, current: .60, nitrogen: 6, substrate: 520 }, prompt: 'Sweep the N₂ fraction across 5–8% at about 4 Pa total pressure. Watch the target coverage rise and the effective yield fall.' },
+  classic: { family: 'plating', name: 'Classic ion plating', hardware: 'Evaporation source', materials: ['Ag','Cu','Al','Ti'], classic: true, defaults: { pressure: -1.45, bias: 1600, ionCurrent: .08, arrival: 2.8, preclean: false }, prompt: 'Select Pre-clean and run with the evaporation source off. Watch Ar⁺ bombard the negatively biased substrate. Switch to Deposit and compare the growth and residue plots.' },
   arc: { family: 'plating', name: 'Arc ion plating · TiN', hardware: 'Ti cathodic arc in N₂', materials: ['Ti'], arc: true, defaults: { pressure: -2.35, bias: 100, ionCurrent: .65, arrival: 5.5, substrate: 520 }, prompt: 'Increase the negative bias and compare ion energy with net growth. The nitrogen-containing arc preset assumes a TiN film.' },
   ibad: { family: 'plating', name: 'Ion beam assisted deposition', hardware: 'Evaporation source + Ar⁺ gun', materials: ['Ag','Cu','Al','Ti'], ibad: true, defaults: { pressure: -4.7, bias: 150, ionCurrent: .25, arrival: .9 }, prompt: 'Sweep beam energy at fixed beam current. Compare the independent ion gun with the plasma sheath of classic ion plating.' },
 };
@@ -46,7 +47,7 @@ export function newSettings(id, symbol = VARIANTS[id].materials[0]) {
 }
 
 export function controlGroups(config, material) {
-  const pressureLimits = config.family === 'evaporation' ? [-7,-4]
+  const pressureLimits = config.family === 'evaporation' ? [-7,-4] : config.diode ? [-1.7,-1.4]
     : config.ibad ? [-6,-3.3] : config.arc ? [-3.7,-2] : [-3,-1];
   const pressure = ['pressure', 'Chamber pressure', 'p', ...pressureLimits, .05, 'mbar'];
   const distance = ['distance', 'Source distance', 'L', 5, 35, .5, 'cm'];
@@ -56,8 +57,8 @@ export function controlGroups(config, material) {
     return [[temperature, pressure], [distance, substrate]];
   }
   if (config.family === 'sputtering') {
-    const energy = ['energy', 'Target ion energy', 'Eᵢ', 100, 600, 5, 'eV'];
-    const current = ['current', config.duty ? 'Target on-current' : 'Target ion current', 'Iᵢ', .05, 1, .01, 'A'];
+    const energy = ['energy', config.diode ? 'Effective target ion energy' : 'Target ion energy', 'Eᵢ', 100, 600, 5, 'eV'];
+    const current = ['current', config.duty ? 'Target on-current' : 'Target ion current', 'Iᵢ', config.diode ? .01 : .05, config.diode ? .10 : 1, .01, 'A'];
     const controls = [[energy, current], [pressure, distance], [substrate]];
     if (config.duty) controls[2].push(['duty', 'Duty cycle', 'D', 20, 100, 1, '%']);
     if (config.reactive) controls[2].push(['nitrogen', 'Nitrogen fraction', 'N₂', 0, 25, .5, '%']);
@@ -78,6 +79,9 @@ export function sourceChart(config, settings, material) {
   if (config.family === 'sputtering') {
     return { title: material.yields ? 'Sputtering yield' : 'RF deposition rate', x: 'Target ion energy Eᵢ (eV)', y: material.yields ? 'Y (atoms/ion)' : 'R (nm/s)', control: 'energy' };
   }
+  if (config.classic && settings.preclean) {
+    return { title: 'Pre-cleaning at current settings', x: 'Bias magnitude |Vₛ| (V)', y: 'Residue cleared in 60 s (%)', control: 'bias' };
+  }
   return { title: 'Deposition and resputtering', x: config.ibad ? 'Ion beam energy (eV)' : 'Bias magnitude |Vₛ| (V)', y: 'Rate (nm/s)', control: 'bias' };
 }
 
@@ -87,8 +91,10 @@ export const THEORY = [
   { title: 'Reading the chamber animation', text: 'Neutral atoms leave over a range of angles and travel in straight segments between collisions. Ion paths illustrate acceleration near powered electrodes, and sputtered atoms appear at target impacts. The diagram slows down flight and pulse timing and groups closely spaced collisions for legibility. The power-off fade illustrates plasma extinction and source cooling. The numerical film model uses its own rates and timing.', label: 'André Anders · plasma sheath, sputtering and ion plating', href: 'https://doi.org/10.1088/1361-6595/AC7F53' },
   { title: 'Evaporation and vapour pressure', text: 'The Hertz–Knudsen source flux is pᵥ/√(2πmkᵦT). The model uses unit evaporation and sticking coefficients, a cosine emitter and effective source areas of 0.6–2.4 cm². It interpolates log₁₀ pᵥ against 1/T between tabulated points. The phase indicator uses the bulk melting point.', label: 'MBE-Komponenten · vapour-pressure anchors', href: 'https://www.mbe-komponenten.de/selection-guide/vapor-pressure/' },
   { title: 'A real silver evaporation', text: 'Kurt J. Lesker reports 0.1–0.5 nm/s at about 1373 K and a base pressure at or below 10⁻⁶ Torr. The Ag boat effective source area was chosen to give about 0.37 nm/s under comparable conditions. Actual rate depends strongly on geometry, source loading and tooling factor.', label: 'Kurt J. Lesker · silver evaporation', href: 'https://www.lesker.com/newweb/deposition_materials/deposition-materials-notes.cfm?pgid=ag1' },
+  { title: 'DC diode and magnetron', text: 'A conventional DC diode uses a negatively biased target and a grounded chamber as the anode. In the example, Ar pressure is 2–4 Pa and the cathode supply is shown at a representative −2.5 kV. Collisions in the sheath make the impact energy lower and spread it out. The slider sets an effective impact energy for the yield calculation. In a magnetron, permanent magnets confine electrons near the target, concentrating ionisation above the erosion racetrack. The drawing shows a cross-section of the field B. The rate model takes pressure, effective current and energy as inputs.', label: 'Gudmundsson, Anders and von Keudell · diode and magnetron sputtering', href: 'https://doi.org/10.1088/1361-6595/AC7F53', extra: [['Planar magnetron cathode · US4198283A', 'https://patents.google.com/patent/US4198283A/en']] },
   { title: 'Sputtering yield and current', text: 'Y is the number of target atoms ejected per incident Ar⁺. Piecewise linear curves use tabulated near-threshold and 100–600 eV metal yields. Ejection is IᵢY/e. RF uses effective ion energy/current. Silica uses an illustrative effective rate law, since compound sputtering needs a separate yield treatment.', label: 'Yamamura and Tawara · yield and energy reference', href: 'https://nifs-repository.repo.nii.ac.jp/record/2000175/files/NIFS-DATA-023.pdf', extra: [['Low-energy yield table', 'https://www.mse.nchu.edu.tw/uploads/bulletin_file/file/5f3615791d41c80133000036/2363_627c1fc0.pdf'], ['600 eV data', 'https://angstromsciences.com/sputtering-yields']] },
   { title: 'Reactive sputtering and TiN', text: 'A Ti target in Ar and N₂ can develop a compound-covered surface. The model balances nitrogen uptake against removal by ion current and assigns the compound-covered area 37% of the metal yield. It switches the nominal film to TiN above 0.15 Pa N₂. Composition, preferential sputtering and hysteresis require a calibrated reactor model.', label: 'Wa̧sniowski et al. · Ti poisoning in Ar/N₂', href: 'https://doi.org/10.1016/j.surfcoat.2006.08.111' },
   { title: 'Ion plating and ion assistance', text: 'The incident film rate is set independently at a 14 cm reference gap before gas attenuation. Classic plating uses a collisional 6 mm sheath estimate. Arc uses an effective charge of 1.5 and 20 eV initial energy. The model applies Ar⁺ metal yields as erosion proxies, including 45% of the Ti yield for TiN. Rₙₑₜ = Rᵢₙ − Rₗₒₛₛ.', label: 'Mattox · ion plating', href: 'https://doi.org/10.1016/S0257-8972(00)00922-1', extra: [['Ti arc data', 'https://www.sciencedirect.com/science/article/pii/0042207X94902615']] },
+  { title: 'In situ substrate preparation', text: 'In classic ion plating, keep the evaporation source off and bias the substrate negatively in an Ar glow discharge. Ion bombardment can desorb adsorbates and sputter surface layers. Switching the source on in the same chamber lets deposition follow without exposing the surface to air. The residue plot illustrates first-order removal on an exposed substrate, scaled by incident ion fluence and effective energy. It does not identify a surface compound or predict adhesion or chemical activation.', label: 'Mattox · sputter cleaning and adhesion in ion plating', href: 'https://doi.org/10.4271/690647' },
   { title: 'Reading the film', text: 'The profile is accumulated at 41 points across a 100 mm wafer. Thickness is dense-bulk equivalent. The cross-section shows current growth conditions schematically, with approximate zone boundaries using Tₛ/Tₘ and pressure for metals. Ion-assisted morphology uses indicative energy per arriving film unit. It does not predict adhesion, grain size or stress.', label: 'Thornton · sputter structure zones', href: 'https://doi.org/10.1116/1.1312732', extra: [['Anders · energetic deposition', 'https://doi.org/10.1016/j.tsf.2009.10.145'], ['RSC · bulk element data', 'https://periodic-table.rsc.org/']] },
 ];

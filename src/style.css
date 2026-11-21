@@ -137,6 +137,9 @@ h1, h2, p, dl, dd { margin: 0; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; min-height: 27px; gap: .3rem; }
 .panel-header h2 { font-size: 1rem; letter-spacing: -.02em; }
 .panel-header .button { min-height: 27px; padding: .12rem .45rem; }
+.control-actions { display: flex; gap: .28rem; white-space: nowrap; }
+.control-actions #preclean, .mobile-nav #compact-preclean { color: var(--accent); background: var(--accent-soft); }
+#compact-preclean { display: none; }
 .section-meta { color: var(--muted); font-size: .78rem; text-align: right; }
 .selects, .sliders { display: grid; align-content: start; gap: .66rem; }
 .selects label { display: grid; gap: .22rem; min-width: 0; font-size: .88rem; color: var(--muted); font-weight: 600; }
@@ -153,6 +156,7 @@ select {
 .slider label { display: flex; justify-content: space-between; align-items: baseline; gap: .25rem; font-size: .88rem; font-weight: 640; }
 .slider output { color: var(--accent); font-family: var(--mono); font-size: .84rem; white-space: nowrap; }
 .slider input { display: block; width: 100%; height: 26px; margin: .1rem 0 0; accent-color: var(--accent); cursor: ew-resize; }
+.slider input:disabled { opacity: .44; cursor: default; }
 .hardware-note { margin-top: auto; color: var(--muted); font-size: .8rem; }
 .chamber-art, .graphic { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; border-radius: 8px; }
 .chamber-art { background: #162944; }
@@ -167,7 +171,10 @@ select {
 .heat-wire { stroke: #e8ab77; }
 .feedthrough rect { fill: #1d344c; stroke: #a4c4e7; }
 .feedthrough path { stroke: #a4c4e7; }
-.magnetic-field { fill: none; stroke: #b7a0e3; stroke-opacity: .48; stroke-width: 1.5; stroke-dasharray: 4 5; }
+.magnetic-field { fill: none; stroke: #f0bf77; stroke-opacity: .9; stroke-width: 1.6; stroke-dasharray: 4 4; }
+.magnetic-field .field-arrow { stroke-dasharray: none; stroke-width: 1.8; }
+.magnetron-pole, .field-label { fill: #ffda99; font: 690 14px system-ui, sans-serif; }
+.magnetron-pole { fill: #f3f5fd; }
 .supply, .terminal { fill: #dfc5ff; stroke: #a58ac9; }
 .supply.heat { fill: #ffcd9d; stroke: #d49f72; }
 .supply rect, .terminal circle { fill: #1b2d49; }
@@ -213,6 +220,8 @@ dialog::backdrop { background: #0c1935a0; }
   .workspace[data-mobile="chamber"] .results, .workspace[data-mobile="plots"] .chamber { display: none; }
 }
 @media (max-width: 650px) {
+  #preclean { display: none; }
+  #compact-preclean { display: block; }
   .topbar { padding: .4rem .65rem; }
   .course { display: none; }
   .footer { padding: .25rem .65rem; font-size: .67rem; }
@@ -313,4 +322,5 @@ dialog::backdrop { background: #0c1935a0; }
 @media (max-height: 525px) and (min-width: 480px) and (max-width: 970px) {
   .controls .panel-header, .chamber .panel-header { display: none; }
   #compact-guide { display: block; }
+  #compact-preclean { display: block; }
 }

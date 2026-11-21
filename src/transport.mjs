@@ -138,9 +138,12 @@ export class ChamberTransport {
     if (sputtering) {
       const current = settings.current;
       this.produce('target', pulse ? 21 + 82 * current : 0, dt, () => {
-        const x = (random() < .5 ? 259 : 341) + uniform(random, -29, 29);
-        const origin = [x + uniform(random, -21, 21), sourceY - uniform(random, 35, 83)];
-        this.guide('argon', origin, [x, sourceY], uniform(random, .19, .45) * (350 / settings.energy) ** .25, 'target');
+        const x = config.diode ? uniform(random, CHAMBER.targetLeft + 2, CHAMBER.targetRight - 2)
+          : (random() < .5 ? 259 : 341) + uniform(random, -22, 22);
+        const origin = config.diode ? [x + uniform(random, -50, 50), sourceY - uniform(random, 70, 145)]
+          : [x + uniform(random, -16, 16), sourceY - uniform(random, 24, 58)];
+        const duration = config.diode ? uniform(random, .29, .55) : uniform(random, .19, .38);
+        this.guide('argon', origin, [x, sourceY], duration * (350 / settings.energy) ** .25, 'target');
       });
       return;
     }
@@ -175,7 +178,7 @@ export class ChamberTransport {
     }
   }
 
-  registerImpact(particle, event, config, sample, mass, thickness, active) {
+  registerImpact(particle, event, sample, mass, thickness, residue, active) {
     const { x, y } = particle;
     if (event === 'wall' || !active) return;
     const random = this.random;
@@ -186,18 +189,19 @@ export class ChamberTransport {
       const emitted = Math.floor(visualYield + random());
       for (let i = 0; i < emitted; i++) this.emit('atom', x, y - 1, uniform(random, 185, 395), -1, mass);
     }
-    if (event === 'substrate' && thickness > .002) {
-      const yieldProxy = Math.min(.95, sample.loss / (sample.loss + .7));
+    if (event === 'substrate') {
+      const yieldProxy = thickness > .002 ? Math.min(.95, sample.loss / (sample.loss + .7))
+        : residue * -Math.expm1(-12 * sample.cleanRate);
       if (random() < yieldProxy) this.emit('removed', x, y + 1, uniform(random, 135, 305), 1, mass);
     }
   }
 
-  update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion) {
+  update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion, residue = 0) {
     this.clock += dt;
     this.darkTime = active ? 0 : this.darkTime + dt;
     const pulse = !config.duty || (this.clock % .62) / .62 < settings.duty / 100;
     const hasPlasma = config.family === 'sputtering' || config.classic || config.arc;
-    const hasHeater = config.family !== 'sputtering' && !config.arc;
+    const hasHeater = config.family !== 'sputtering' && !config.arc && !settings.preclean;
     const targets = {
       plasma: active && hasPlasma && (reducedMotion || pulse) ? .56 + .4 * Math.min(1, (settings.current ?? settings.ionCurrent + .35)) : 0,
       heat: active && hasHeater ? Math.min(1, .53 + .22 * Math.log1p(sample.gross * 5)) : 0,
@@ -231,7 +235,7 @@ export class ChamberTransport {
       }
       const event = particle.duration ? guidedStep(particle, dt) : neutralStep(particle, dt, meanPath, sourceY, this.random);
       particle.trail = particle.trail.slice(-5);
-      if (event) this.registerImpact(particle, event, config, sample, mass, thickness, active);
+      if (event) this.registerImpact(particle, event, sample, mass, thickness, residue, active);
       else if (this.particles.length < TRACER_LIMIT) this.particles.push(particle);
     }
     if (active) this.spawn(dt, config, method, settings, sample, mass, sourceY, pulse);
