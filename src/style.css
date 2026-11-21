@@ -298,6 +298,21 @@ dialog::backdrop { background: #0c1935a0; }
   .workspace { grid-template-columns: minmax(225px, .88fr) minmax(0, 1.4fr); }
   .workspace[data-mobile="chamber"] .results, .workspace[data-mobile="plots"] .chamber { display: none; }
 }
+@media (min-width: 651px) and (max-height: 900px) {
+  .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .34rem .65rem; }
+  .slider label { display: grid; align-content: start; gap: .06rem; font-size: .79rem; }
+  .slider output { font-size: .77rem; }
+}
+@media (min-width: 651px) and (max-height: 820px) {
+  .selects { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: .37rem; }
+  .selects label { gap: .1rem; font-size: .79rem; }
+}
+@media (min-width: 971px) and (max-height: 700px) {
+  .controls { gap: .33rem; padding: .46rem; }
+  .controls select { min-height: 28px; padding-block: .1rem; }
+  .slider input { height: 20px; }
+  .hardware-note { display: none; }
+}
 @media (max-width: 650px) {
   #preclean { display: none; }
   #compact-preclean { display: block; }
