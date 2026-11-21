@@ -220,7 +220,9 @@ select {
 .roughness { font-weight: 700; white-space: nowrap; }
 .roughness sub { line-height: 0; }
 .chamber-sensor text { fill: #c9d8e8; font: 690 12px system-ui, sans-serif; }
-.model-view, .sensor-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .45rem; }
+.model-view, .lightbox-view, .sensor-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .45rem; }
+.lightbox-view .view-reset { padding: .2rem .43rem; min-height: 28px; font-size: .76rem; white-space: nowrap; }
+#film-lightbox { background: #232a31; }
 .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .25rem; }
 .model-toolbar .seg button, .sensor-view .seg button { padding: .2rem .43rem; min-height: 26px; }
 .micrograph { width: 100%; flex: 1; min-height: 0; display: block; background: #141619; border-radius: 7px; cursor: grab; touch-action: none; }
@@ -318,6 +320,12 @@ dialog::backdrop { background: #0c1935a0; }
   .top-actions { gap: .25rem; }
   .topbar .button { padding-inline: .34rem; }
   .thermal-warning { white-space: nowrap; }
+}
+@media (max-width: 500px) {
+  .plot-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plot-nav button { min-height: 25px; padding-block: .12rem; }
+  .lightbox-view .model-toolbar { gap: .18rem; }
+  .lightbox-view .model-toolbar .seg button { padding-inline: .33rem; }
 }
 @media (max-width: 650px) and (max-height: 655px) {
   .lab-top h1 { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }

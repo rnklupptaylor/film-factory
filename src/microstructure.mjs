@@ -313,7 +313,8 @@ export function surfaceMesh(model) {
   return packed;
 }
 
-export function makeMorphology({ segments, reference }) {
+export function makeMorphology({ segments, reference, summaryOnly = false }) {
   const { voxels, tops, ...stats } = simulateMorphology(segments, reference);
+  if (summaryOnly) return stats;
   return { ...stats, tops, ...exposedGrains(voxels, tops), mesh: surfaceMesh({ ...stats, voxels }) };
 }

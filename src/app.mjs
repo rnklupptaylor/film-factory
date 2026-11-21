@@ -6,6 +6,7 @@ import { ChamberTransport } from './transport.mjs';
 import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gasReadings, processGas, chamberPressure, pressureGauge } from './instruments.mjs';
 import { growthConditions } from './microstructure.mjs';
 import { FilmMicroscope, paintGrainMap } from './microscope.mjs';
+import { FilmLightbox } from './lightbox.mjs';
 
 const el = (id) => document.getElementById(id);
 const option = (value, label) => `<option value="${value}">${label}</option>`;
@@ -42,6 +43,8 @@ let frame = 0;
 let manualTheme = false;
 let chamber;
 let microscope;
+let lightbox, lightboxMode = 'final';
+let filmSurface;
 let modelMode = 'auto', modelStyle = 'sem', sensorMode = 'qcm', tooling = 100;
 let growthLog = [], growthDuration = 0, growthReference = 0, modelRun = 0;
 let qcmMass = 0, qcmThickness = 0, qcmHistory = [[0,0]];
@@ -372,6 +375,29 @@ function selectModelStyle(style) {
   if (style === 'sem') renderGrainInset();
 }
 
+function renderLightbox() {
+  if (!lightbox) lightbox = new FilmLightbox(el('film-lightbox'), el('lightbox-readout'), morphologyWorkerCode);
+  const remaining = lightboxMode === 'final' ? RUN_LENGTH - seconds : 0;
+  const steady = remaining > 0 && (growthLog.length === 0 || (growthLog.length === 1 && growthLog[0].input === growthInput));
+  const timeline = steady ? 'steady' : running ? Math.floor(seconds / 2) : seconds;
+  const key = `${lightboxMode}|${modelRun}|${timeline}|${JSON.stringify(growthInput)}|${sample.film.name}`;
+  if (key !== lightbox.key) {
+    const segments = growthLog.map(({ input, ...part }) => part);
+    if (remaining > 0) {
+      if (growthLog.at(-1)?.input === growthInput) segments.at(-1).duration += remaining;
+      else segments.push({ ...growthInput, duration: remaining });
+    }
+    const profile = remaining > 0 ? advanceFilm(thickness, sample, remaining) : thickness;
+    const film = remaining > 0 && sample.net > 0 ? sample.film : filmSurface ?? sample.film;
+    lightbox.request({ key, profile, film, wafer: settings.wafer, name: lightboxMode === 'final' ? 'Projected final film' : 'This run',
+      input: { segments, reference: growthReference || growthInput.gross * RUN_LENGTH, summaryOnly: true } });
+  }
+  el('plot-meta').textContent = lightboxMode === 'final' ? 'Projected at 60 s' : 'Film so far';
+  el('plot-caption').textContent = lightbox.gpu
+    ? 'Drag or use arrow keys to rotate. Roughness, gaps and porosity drive the illustrated finish.'
+    : 'Simplified surface view. Drag or use arrow keys to tilt the sample.';
+}
+
 function instrumentCards(readings) {
   return `<dl class="sensor-grid">${readings.map(([label,value]) => `<div class="sensor-reading"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
 }
@@ -425,10 +451,12 @@ function renderInstruments() {
 
 function renderPlot() {
   el('model-view').hidden = plot !== 'morphology';
+  el('lightbox-view').hidden = plot !== 'lightbox';
   el('sensor-view').hidden = plot !== 'diagnostics';
-  el('graphic').hidden = plot === 'morphology' || plot === 'diagnostics';
+  el('graphic').hidden = plot === 'morphology' || plot === 'diagnostics' || plot === 'lightbox';
   if (plot === 'morphology' || modelStyle === 'grains') renderMorphology();
   if (plot === 'morphology') return;
+  if (plot === 'lightbox') { renderLightbox(); return; }
   if (plot === 'diagnostics') { renderInstruments(); return; }
   let view;
   if (plot === 'growth' && isPreclean()) {
@@ -490,6 +518,7 @@ function resetRun() {
   growthLog = [];
   growthDuration = 0;
   growthReference = 0;
+  filmSurface = undefined;
   modelMode = 'auto';
   modelRun++;
   qcmMass = qcmThickness = 0;
@@ -524,6 +553,7 @@ function trackFilm(elapsed, now) {
     part.duration += dt;
     growthDuration += dt;
     if (!growthReference && growthInput.gross) growthReference = growthInput.gross * RUN_LENGTH;
+    if (sample.net > 0) filmSurface = sample.film;
     qcmMass += dt * crystalInput.massRate;
     qcmThickness += dt * crystalInput.thicknessRate;
   }
@@ -676,6 +706,19 @@ el('model-view').addEventListener('click', (event) => {
     pressed(el('model-view'), 'camera', event.target.dataset.camera);
   }
 });
+el('lightbox-view').addEventListener('click', (event) => {
+  const { finish, light } = event.target.dataset;
+  if (finish) {
+    lightboxMode = finish;
+    pressed(el('lightbox-view'), 'finish', finish);
+    renderLightbox();
+  }
+  if (light) {
+    lightbox.setLighting(light);
+    pressed(el('lightbox-view'), 'light', light);
+  }
+});
+el('lightbox-reset').addEventListener('click', () => lightbox.resetView());
 el('chamber-labels').addEventListener('click', (event) => {
   const button = event.currentTarget;
   const show = button.getAttribute('aria-pressed') !== 'true';

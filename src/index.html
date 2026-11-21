@@ -73,7 +73,7 @@
     <p id="summary" class="summary"></p>
     <nav class="seg mobile-nav" aria-label="Workspace view">
       <button type="button" data-mobile="chamber" aria-pressed="true">Chamber</button>
-      <button type="button" data-mobile="plots" aria-pressed="false">Plots</button>
+      <button type="button" data-mobile="plots" aria-pressed="false">Film &amp; diagnostics</button>
       <button id="compact-guide" type="button">Try it</button>
       <button id="compact-preclean" type="button" hidden>Pre-clean</button>
     </nav>
@@ -104,12 +104,13 @@
         </div>
       </section>
       <section class="panel results" aria-labelledby="results-title">
-        <div class="panel-header"><h2 id="results-title">Film &amp; plots</h2><span id="plot-meta" class="section-meta"></span></div>
-        <nav class="seg plot-nav" aria-label="Film and plot selection">
+        <div class="panel-header"><h2 id="results-title">Film &amp; diagnostics</h2><span id="plot-meta" class="section-meta"></span></div>
+        <nav class="seg plot-nav" aria-label="Film and diagnostics views">
           <button type="button" data-plot="growth" aria-pressed="true">Growth</button>
           <button type="button" data-plot="profile" aria-pressed="false">Profile</button>
           <button type="button" data-plot="source" aria-pressed="false">Source</button>
           <button type="button" data-plot="morphology" aria-pressed="false">Morphology</button>
+          <button type="button" data-plot="lightbox" aria-pressed="false">Lightbox</button>
           <button type="button" data-plot="diagnostics" aria-pressed="false">Sensors</button>
         </nav>
         <div id="graphic" class="graphic"></div>
@@ -130,6 +131,21 @@
           </div>
           <canvas id="micrograph" class="micrograph" role="img" aria-label="Simulated film morphology" tabindex="0"></canvas>
           <p id="model-readout" class="instrument-note">Preparing surface…</p>
+        </div>
+        <div id="lightbox-view" class="lightbox-view" hidden>
+          <div class="model-toolbar">
+            <nav class="seg" aria-label="Lightbox film state">
+              <button type="button" data-finish="final" aria-pressed="true">Final</button>
+              <button type="button" data-finish="actual" aria-pressed="false">This run</button>
+            </nav>
+            <nav class="seg" aria-label="Lightbox lighting">
+              <button type="button" data-light="studio" aria-pressed="true">Studio</button>
+              <button type="button" data-light="raking" aria-pressed="false">Raking</button>
+            </nav>
+            <button type="button" class="button view-reset" id="lightbox-reset" aria-label="Reset sample rotation">Reset view</button>
+          </div>
+          <canvas id="film-lightbox" class="micrograph" role="img" aria-label="Rotatable coated sample in a lightbox" tabindex="0"></canvas>
+          <p id="lightbox-readout" class="instrument-note">Preparing surface…</p>
         </div>
         <div id="sensor-view" class="sensor-view" hidden>
           <nav class="seg" aria-label="Chamber instrument">
@@ -183,6 +199,7 @@
   %%MICROSTRUCTURE.MJS%%
   const morphologyWorkerCode = %%MORPHOLOGY_WORKER%%;
   %%MICROSCOPE.MJS%%
+  %%LIGHTBOX.MJS%%
   %%APP.MJS%%
   </script>
 </body>

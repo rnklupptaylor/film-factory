@@ -4,7 +4,7 @@ const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
 const [page, pkg] = await Promise.all([read('src/index.html'), read('package.json')]);
 const { version, teachingVersion = version } = JSON.parse(pkg);
-const includes = ['style.css', 'physics.mjs', 'instruments.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'microstructure.mjs', 'microscope.mjs', 'app.mjs'];
+const includes = ['style.css', 'physics.mjs', 'instruments.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'microstructure.mjs', 'microscope.mjs', 'lightbox.mjs', 'app.mjs'];
 const bundle = (source) => source.replace(/^import\s+.*?\s+from\s+['"][^'"]+['"];\r?\n/gms, '').replace(/^export\s+(?=(?:const|function|class)\s)/gm, '');
 let html = page.replaceAll('%%VERSION%%', teachingVersion);
 for (const name of includes) {
@@ -16,7 +16,8 @@ for (const name of includes) {
 const kernel = bundle(await read('src/microstructure.mjs'));
 const worker = `${kernel}\nself.onmessage = ({ data }) => {
   const model = makeMorphology(data);
-  self.postMessage(model, [model.mesh.buffer, model.tops.buffer, model.grainMap.buffer]);
+  const transfer = model.mesh ? [model.mesh.buffer, model.tops.buffer, model.grainMap.buffer] : [];
+  self.postMessage(model, transfer);
 };`;
 html = html.replace('%%MORPHOLOGY_WORKER%%', () => JSON.stringify(worker).replaceAll('<', '\\u003c'));
 const output = new URL('build/deploy/', root);
