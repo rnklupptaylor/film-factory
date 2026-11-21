@@ -1,5 +1,5 @@
 {
-  "name": "coat-of-atoms",
+  "name": "film-factory",
   "compatibility_date": "2025-09-01",
   "assets": { "directory": "./build/deploy" },
   "workers_dev": true,

@@ -16,4 +16,4 @@ for (const name of includes) {
 const output = new URL('build/deploy/', root);
 await mkdir(output, { recursive: true });
 await writeFile(new URL('index.html', output), html);
-console.log(`Built Coat of Atoms ${teachingVersion} → build/deploy/index.html`);
+console.log(`Built Film Factory ${teachingVersion} → build/deploy/index.html`);

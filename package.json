@@ -1,6 +1,7 @@
 {
-  "name": "coat-of-atoms",
-  "version": "0.1.0",
+  "name": "film-factory",
+  "version": "1.0.0",
+  "teachingVersion": "1.0",
   "private": true,
   "type": "module",
   "scripts": {

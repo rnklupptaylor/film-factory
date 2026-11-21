@@ -1,7 +1,144 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coat of Atoms</title>
-<main><h1>Coat of Atoms</h1><p>An interactive teaching app on physical vapour deposition is in development.</p><p>Version %%VERSION%%</p></main>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Explore physical vapour deposition in an interactive thin film teaching app.">
+  <meta name="theme-color" content="#f3f3f0">
+  <title>Film Factory</title>
+  <style>%%STYLE.CSS%%</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="Film Factory, main menu">
+      <svg viewBox="0 0 34 34" width="31" height="31" aria-hidden="true">
+        <rect x="1" y="1" width="32" height="32" rx="8" fill="currentColor"/>
+        <path d="m8 22 9 4 9-4M8 17l9 4 9-4M8 12l9-4 9 4-9 4Z" fill="none" stroke="white" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Film Factory</span>
+    </a>
+    <span class="course">Thin Film Processing</span>
+    <div class="top-actions">
+      <button id="theme" class="button theme" type="button" aria-label="Switch appearance" title="Switch appearance">◐</button>
+      <button id="theory" class="button" type="button">Theory</button>
+    </div>
+  </header>
+
+  <main id="home" class="home">
+    <div class="home-copy">
+      <p class="eyebrow">Thin Film Processing</p>
+      <h1>Film Factory</h1>
+      <p>Explore how thin films are made.</p>
+    </div>
+    <nav class="mode-menu" aria-label="Film Factory modes">
+      <a class="mode-card" href="#pvd">
+        <div class="mode-art">
+          <svg viewBox="0 0 520 230" role="img" aria-label="Atoms and ions travelling from a source to a thin film" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <pattern id="menu-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#9ebbe1" stroke-opacity=".23"/></pattern>
+              <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#21446d"/><stop offset="1" stop-color="#142941"/></linearGradient>
+              <linearGradient id="menu-film"><stop stop-color="#4f9ef1"/><stop offset=".55" stop-color="#a8d7ff"/><stop offset="1" stop-color="#68adfa"/></linearGradient>
+            </defs>
+            <rect width="520" height="230" fill="url(#glass)"/>
+            <rect width="520" height="230" fill="url(#menu-grid)"/>
+            <rect x="137" y="22" width="246" height="189" rx="27" fill="#192d49" stroke="#83a6d2" stroke-width="2"/>
+            <path d="M116 130h22m244 0h22M260 23V4" stroke="#83a6d2" stroke-width="4"/>
+            <path d="M235 179 188 63m67 116-21-116m27 116 5-116m0 116 33-116m-9 116 47-116" fill="none" stroke="#6b9fea" stroke-dasharray="3 7" stroke-opacity=".7"/>
+            <rect x="177" y="51" width="166" height="9" rx="2" fill="#c0cddd"/>
+            <rect x="179" y="60" width="162" height="5" rx="2" fill="url(#menu-film)"/>
+            <path d="M215 179h90l-12 16h-66Z" fill="#526984" stroke="#95acc4"/>
+            <ellipse cx="260" cy="179" rx="31" ry="3" fill="#f3c477"/>
+            <g fill="#89c3ff"><circle cx="217" cy="117" r="3"/><circle cx="237" cy="79" r="3"/><circle cx="254" cy="151" r="3.5"/><circle cx="282" cy="107" r="4"/><circle cx="314" cy="118" r="3"/><circle cx="203" cy="87" r="3"/><circle cx="286" cy="148" r="3"/></g>
+            <g fill="none" stroke="#d8a4ff" stroke-width="2"><circle cx="224" cy="149" r="5"/><circle cx="301" cy="84" r="5"/><circle cx="268" cy="72" r="5"/><path d="M221 149h6m-3-3v6m74-68h6m-3-3v6m-36-15h6m-3-3v6"/></g>
+          </svg>
+        </div>
+        <div class="mode-description">
+          <h2>The Atom Shop (PVD)</h2>
+          <p>Evaporation, sputtering and ion plating</p>
+          <span class="mode-action">Open mode</span>
+        </div>
+      </a>
+    </nav>
+  </main>
+
+  <main id="pvd" class="lab" hidden>
+    <div class="lab-top">
+      <div>
+        <p class="eyebrow">The Atom Shop (PVD)</p>
+        <h1 id="question"></h1>
+      </div>
+      <nav class="seg technique-nav" id="techniques" aria-label="PVD technique"></nav>
+    </div>
+    <p id="summary" class="summary"></p>
+    <nav class="seg mobile-nav" aria-label="Workspace view">
+      <button type="button" data-mobile="chamber" aria-pressed="true">Chamber</button>
+      <button type="button" data-mobile="plots" aria-pressed="false">Plots</button>
+      <button id="compact-guide" type="button">Try it</button>
+    </nav>
+    <div class="workspace" id="workspace" data-mobile="chamber">
+      <section class="panel controls" aria-labelledby="controls-title">
+        <div class="panel-header"><h2 id="controls-title">Process settings</h2><button id="guide" class="button" type="button">Try it</button></div>
+        <div class="selects">
+          <label><span>Method</span><select id="variant" aria-label="Method"></select></label>
+          <label><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>
+        </div>
+        <nav class="seg control-nav" id="control-pages" aria-label="Setting groups"></nav>
+        <div id="sliders" class="sliders"></div>
+        <p class="hardware-note" id="hardware-note"></p>
+      </section>
+      <section class="panel chamber" aria-labelledby="chamber-title">
+        <div class="panel-header"><h2 id="chamber-title">Vacuum chamber</h2><span class="section-meta">Schematic</span></div>
+        <div id="chamber-art" class="chamber-art"></div>
+        <div class="chamber-footer">
+          <div class="legend" id="legend"></div>
+          <button id="enlarge-chamber" class="button" type="button" aria-pressed="false">Expand</button>
+        </div>
+      </section>
+      <section class="panel results" aria-labelledby="results-title">
+        <div class="panel-header"><h2 id="results-title">Film &amp; plots</h2><span id="plot-meta" class="section-meta"></span></div>
+        <nav class="seg plot-nav" aria-label="Film and plot selection">
+          <button type="button" data-plot="growth" aria-pressed="true">Growth</button>
+          <button type="button" data-plot="profile" aria-pressed="false">Profile</button>
+          <button type="button" data-plot="source" aria-pressed="false">Source</button>
+          <button type="button" data-plot="section" aria-pressed="false">Section</button>
+        </nav>
+        <div id="graphic" class="graphic"></div>
+        <p id="plot-caption" class="plot-caption"></p>
+      </section>
+    </div>
+    <dl id="metrics" class="metrics" aria-label="Live readings"></dl>
+    <div class="transport">
+      <button id="run" class="button primary" type="button">Run</button>
+      <button id="reset" class="button" type="button">Reset</button>
+      <progress id="progress" max="60" value="0" aria-label="Simulation progress"></progress>
+      <span id="clock" class="clock">0 / 60 s</span>
+      <span id="run-status" class="run-status" role="status">Ready</span>
+    </div>
+  </main>
+
+  <footer class="footer"><span>FAU Erlangen-Nürnberg · Prof. Robin N. Klupp Taylor</span><span>v%%VERSION%%</span></footer>
+
+  <dialog id="dialog" aria-labelledby="dialog-title">
+    <div class="dialog-shell">
+      <header class="dialog-header">
+        <h2 id="dialog-title"></h2>
+        <button id="close" class="button" type="button">Close</button>
+      </header>
+      <div id="dialog-content" class="dialog-content"></div>
+      <nav class="dialog-nav" aria-label="Theory pages" id="dialog-nav">
+        <button id="previous" class="button" type="button">Previous</button>
+        <span id="page-count"></span>
+        <button id="next" class="button" type="button">Next</button>
+      </nav>
+    </div>
+  </dialog>
+
+  <script>
+  'use strict';
+  %%PHYSICS.MJS%%
+  %%CONTENT.MJS%%
+  %%GRAPHICS.MJS%%
+  %%APP.MJS%%
+  </script>
+</body>
 </html>

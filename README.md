@@ -1,14 +1,32 @@
-# Coat of Atoms
+# Film Factory
 
-An interactive teaching app on physical vapour deposition for Thin Film Processing at FAU Erlangen-Nürnberg. Explore evaporation, sputtering and ion plating in a virtual coating chamber.
+Film Factory is a teaching app on thin film processing at FAU Erlangen-Nürnberg. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber.
 
 | Branch | Cloudflare address |
 | --- | --- |
-| `main` · Student release | https://coat-of-atoms.ipt-apps.workers.dev |
-| `dev` · Development | https://dev-coat-of-atoms.ipt-apps.workers.dev |
+| `main` · Student release | https://film-factory.ipt-apps.workers.dev |
+| `dev` · Development | https://dev-film-factory.ipt-apps.workers.dev |
 
-Use Node.js 20 or later. Run `npm run build` and open `build/deploy/index.html` in a browser. Run `npm test` to check the build. The generated app is self-contained.
+## In The Atom Shop
 
-Sources are in `src/`, the build script is in `tools/` and checks are in `tests/`. Cloudflare Workers Builds runs `npm run build`, publishes with `npx wrangler deploy`, and uses `npx wrangler preview` for preview builds. The production branch is `main`.
+- **Evaporation** includes direct and indirect resistance heating, electron beam heating and radiation heating. Vary source temperature, pressure, distance and substrate temperature.
+- **Sputtering** includes DC, pulsed DC, RF at 13.56 MHz and reactive Ti magnetron sputtering. Compare Ar⁺ yields, pressure, duty cycle and nitrogen-induced target poisoning.
+- **Ion plating** includes classic plasma-based plating, arc ion plating of TiN and ion beam assisted deposition. Compare deposition and resputtering at different bias and ion current.
+- **Film and plots** show the growth history and projected thickness, the thickness profile across a 100 mm wafer, the source response and a schematic film cross-section. The 60 s runs play at 5× and preserve the effect of earlier slider changes.
+
+The in-app Theory pages document the lecture references, the literature and material data, and modelling assumptions. The rates are reduced-order teaching estimates. The morphology drawings illustrate trends.
+
+## Build and test
+
+Use Node.js 20 or later. No dependencies to install.
+
+```text
+npm run build
+npm test
+```
+
+Open `build/deploy/index.html` in a browser. The generated page is self-contained and works offline. Sources are in `src/`, the build is in `tools/` and checks are in `tests/`. The mode menu lives in `src/index.html`, with PVD content, calculations, graphics and controls in their own modules.
+
+Cloudflare Workers Builds runs `npm run build`, publishes with `npx wrangler deploy`, and uses `npx wrangler preview` for preview builds. The production branch is `main`. Develop on `dev`, verify the preview and merge for release. The footer uses `teachingVersion` from `package.json`.
 
 MIT licence. Course and concept by Prof. Robin N. Klupp Taylor, FAU Erlangen-Nürnberg. Developed with Codex.
