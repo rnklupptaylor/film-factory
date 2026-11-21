@@ -61,8 +61,9 @@ function circuitMarkup(config, method, y, preclean) {
   const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/></g>
     <path class="${biased ? 'voltage-wire' : 'ground-wire'}" d="M300 64v45"/>
     ${electricalContact(300,109,biased ? 'voltage' : 'ground','Substrate holder connection')}`;
-  const shell = `<path class="ground-wire" d="M105 348H83"/>${earth(83, 348)}
-    <text class="chamber-label minor" x="9" y="354">${config.diode || config.classic ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
+  const wallY = config.ibad ? 367 : 348;
+  const shell = `<path class="ground-wire" d="M105 ${wallY}H83"/>${earth(83, wallY)}
+    <text class="chamber-label minor" x="9" y="${wallY + 6}">${config.diode || config.classic ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
   const yBox = 326;
   let source;
   if (config.family === 'sputtering' || config.arc) {
@@ -272,14 +273,14 @@ export function chamberMarkup(config, method, settings, material, film) {
     ${annotation('To pump', 16, pumpY + 42, `M65 ${pumpY + 37}l12-15`)}
     ${annotation('Substrate holder', 133, 156, 'M164 144l26-27')}
     ${annotation('Substrate', 391, 190, 'M396 186h12v-35l-10-19', { detail: wafer.label, anchor: 'end' })}
-    ${annotation('TC', 266, 96, 'M270 96l11 12', { anchor: 'end' })}
+    ${annotation('TC', 266, 103, 'M271 101l10 8', { anchor: 'end' })}
     ${annotation('QCM', 439, 184, 'M439 172v-11', { anchor: 'middle' })}
     ${hasPlasma ? annotation('OES', 465, 204, 'M468 198l5-7', { anchor: 'end' }) : ''}
     ${config.family === 'sputtering' || config.arc
       ? annotation(config.arc ? 'Ti cathode' : 'Target', 150, y + 5, `M200 ${y + 1}l24 4`, { detail: method === 'rf' ? '− self-bias' : config.ito === 'ceramic' ? 'ITO ceramic' : config.ito ? 'In–Sn alloy' : '' })
       : annotation(method === 'ebeam' ? 'Hearth' : 'Source', 151, y + 7, `M205 ${y + 3}l${method === 'filament' ? 39 : 31} 2`)}
     ${method === 'ebeam' ? annotation('E-gun', 427, y + 31, `M423 ${y + 28}h-11`) : ''}
-    ${config.ibad ? annotation('Ion gun', 207, 308, 'M211 294l-25-20') : ''}
+    ${config.ibad ? annotation('Ion gun', 220, 276, 'M215 271l-22-8') : ''}
     ${product ? `<g id="in-chamber-film-label" visibility="hidden">${annotation(`${product} film`, 330, 174, 'M327 165l-18-27')}</g>` : ''}
     <g id="film-grain-inset" visibility="hidden">
       <rect x="502" y="158" width="106" height="136" rx="7" fill="#1e334d" stroke="#89aaca"/>
