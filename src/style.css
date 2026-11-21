@@ -221,7 +221,32 @@ select {
 .roughness { font-weight: 700; white-space: nowrap; }
 .roughness sub { line-height: 0; }
 .chamber-sensor text { fill: #c9d8e8; font: 690 12px system-ui, sans-serif; }
-.model-view, .lightbox-view, .sensor-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .45rem; }
+.model-view, .lightbox-view, .sensor-view, .zone-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .45rem; }
+.zone-view { gap: .22rem; }
+.zone-heading { display: flex; justify-content: space-between; align-items: center; gap: .3rem; }
+.zone-heading h3 { margin: 0; font-size: .91rem; line-height: 1.13; }
+.zone-heading .button { padding: .14rem .4rem; min-height: 26px; font-size: .74rem; white-space: nowrap; }
+.zone-values { color: var(--ink); font: 680 .79rem var(--mono); overflow-wrap: anywhere; }
+.zone-view:not([hidden]) + .sensor-view[hidden] + .plot-caption { min-height: 0; }
+.zone-diagram { background: var(--surface-alt); }
+.zone-grid-line, .zone-axis, .zone-cursor, .zone-reference { fill: none; vector-effect: non-scaling-stroke; }
+.zone-grid-line { stroke: var(--line); stroke-opacity: .67; stroke-width: .8; }
+.zone-axis { stroke: var(--muted); stroke-width: 1; }
+.zone-cursor { stroke: var(--plot); stroke-width: 1.15; stroke-dasharray: 4 3; }
+.zone-reference { stroke: var(--loss); stroke-width: 2; stroke-dasharray: 4 3; }
+.zone-reference-dot { fill: var(--surface); stroke: var(--loss); stroke-width: 1.5; }
+.zone-point-halo { fill: var(--surface); stroke: var(--plot); stroke-width: 1.3; }
+.zone-point { fill: var(--plot); }
+.zone-region-text, .zone-axis-label, .zone-reference-label, .zone-tick { fill: var(--ink); font-family: system-ui, sans-serif; }
+.zone-region-text, .zone-reference-label { font-weight: 720; paint-order: stroke; stroke: var(--surface-alt); stroke-width: 2.5; stroke-linejoin: round; }
+.zone-reference-label { fill: var(--loss); font-size: 11px; }
+.zone-axis-label { font-size: 13px; font-weight: 670; }
+.zone-tick { fill: var(--muted); font: 11.5px var(--mono); }
+.zone-one { fill: #8980c750; }
+.zone-transition { fill: #589fc859; }
+.zone-two { fill: #3ba59254; }
+.zone-three { fill: #bb8b325c; }
+.zone-blend { fill: #87949b32; }
 .lightbox-view .view-reset { padding: .2rem .43rem; min-height: 28px; font-size: .76rem; white-space: nowrap; }
 #film-lightbox { background: #232a31; }
 .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .25rem; }
@@ -322,9 +347,9 @@ dialog::backdrop { background: #0c1935a0; }
   .topbar .button { padding-inline: .34rem; }
   .thermal-warning { white-space: nowrap; }
 }
-@container film-results (max-width: 365px) {
-  .plot-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .plot-nav button { min-height: 25px; padding-block: .12rem; }
+@container film-results (max-width: 455px) {
+  .plot-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .plot-nav button { min-height: 25px; padding: .12rem .19rem; font-size: .75rem; }
   .lightbox-view .model-toolbar { gap: .18rem; flex-wrap: wrap; }
   .lightbox-view .model-toolbar .seg button { padding-inline: .3rem; }
 }

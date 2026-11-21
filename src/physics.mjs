@@ -3,6 +3,8 @@ export const E = 1.602176634e-19;
 const AVOGADRO = 6.02214076e23;
 const ARGON_DIAMETER = 3.4e-10;
 export const WAFER_RADIUS_CM = 5;
+export const TIN_NITROGEN_PA = .15;
+export const ITO_OXIDE_PA = .030;
 export const POSITIONS = Array.from({ length: 41 }, (_, i) => (i - 20) / 4);
 
 // Pressure anchors in ascending order from 10⁻⁷ to 10⁻¹ mbar (MBE-Komponenten).
@@ -85,7 +87,7 @@ export function rates(config, settings, material) {
         const uptake = oxygenPa / .013;
         poisoning = uptake / (uptake + ionCurrent / (.35 * .70));
         gross *= 1.65 * (1 - .55 * poisoning);
-        film = oxygenPa === 0 ? MATERIALS.InSn : oxygenPa >= .030 ? MATERIALS.ITO : MATERIALS.InSnOx;
+        film = oxygenPa === 0 ? MATERIALS.InSn : oxygenPa >= ITO_OXIDE_PA ? MATERIALS.ITO : MATERIALS.InSnOx;
       }
     } else if (material.yields) {
       yieldValue = sputterYield(material, settings.energy);
@@ -97,7 +99,7 @@ export function rates(config, settings, material) {
       const uptake = nitrogen / .20;
       poisoning = uptake / (uptake + ionCurrent / .25);
       yieldValue *= 1 - .63 * poisoning;
-      film = nitrogen >= .15 ? MATERIALS.TiN : material;
+      film = nitrogen >= TIN_NITROGEN_PA ? MATERIALS.TiN : material;
     }
     if (material.yields) gross = thicknessRate(ionCurrent / E * yieldValue * geometry * transmission, film);
   } else {

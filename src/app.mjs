@@ -7,6 +7,7 @@ import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gas
 import { growthConditions } from './microstructure.mjs';
 import { FilmMicroscope, paintGrainMap } from './microscope.mjs';
 import { FilmLightbox } from './lightbox.mjs';
+import { zoneDiagramMarkup, zoneModel } from './zones.mjs';
 
 const el = (id) => document.getElementById(id);
 const option = (value, label) => `<option value="${value}">${label}</option>`;
@@ -398,6 +399,28 @@ function renderLightbox() {
     : 'Simplified surface view. Drag or use arrow keys to tilt the sample.';
 }
 
+function renderZoneModel() {
+  const model = zoneModel(config, settings, sample);
+  el('plot-meta').textContent = model.kind === 'thermal' || model.kind === 'thornton' ? 'Schematic zones'
+    : model.kind === 'assist' || model.kind === 'etch' ? 'Projection' : 'Study comparison';
+  el('zone-name').textContent = model.name;
+  el('zone-subject').textContent = model.subject;
+  el('zone-chart').innerHTML = zoneDiagramMarkup(model);
+  el('zone-values').textContent = model.operating;
+  el('zone-reading').textContent = model.reading;
+  el('plot-caption').textContent = model.context;
+}
+
+function showZoneNotes() {
+  const model = zoneModel(config, settings, sample);
+  el('dialog-title').textContent = model.name;
+  const sources = model.links.map(([label, url]) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('');
+  el('dialog-content').innerHTML = `<p><strong>${model.subject}</strong></p><p>${model.detail}</p><p>${model.context}</p>
+    <p>These are the current recipe settings. Morphology records growth as the settings change.</p>${sources}`;
+  el('dialog-nav').hidden = true;
+  el('dialog').showModal();
+}
+
 function instrumentCards(readings) {
   return `<dl class="sensor-grid">${readings.map(([label,value]) => `<div class="sensor-reading"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
 }
@@ -452,11 +475,13 @@ function renderInstruments() {
 function renderPlot() {
   el('model-view').hidden = plot !== 'morphology';
   el('lightbox-view').hidden = plot !== 'lightbox';
+  el('zone-view').hidden = plot !== 'zones';
   el('sensor-view').hidden = plot !== 'diagnostics';
-  el('graphic').hidden = plot === 'morphology' || plot === 'diagnostics' || plot === 'lightbox';
+  el('graphic').hidden = ['morphology', 'diagnostics', 'lightbox', 'zones'].includes(plot);
   if (plot === 'morphology' || modelStyle === 'grains') renderMorphology();
   if (plot === 'morphology') return;
   if (plot === 'lightbox') { renderLightbox(); return; }
+  if (plot === 'zones') { renderZoneModel(); return; }
   if (plot === 'diagnostics') { renderInstruments(); return; }
   let view;
   if (plot === 'growth' && isPreclean()) {
@@ -573,7 +598,7 @@ function trackFilm(elapsed, now) {
     renderClock();
     drawChamberSurface();
     renderMetrics();
-    if (plot !== 'source' && (plot !== 'diagnostics' || sensorMode !== 'vacuum')) renderPlot();
+    if (plot !== 'source' && plot !== 'zones' && (plot !== 'diagnostics' || sensorMode !== 'vacuum')) renderPlot();
     else if (modelStyle === 'grains') renderMorphology();
   }
 }
@@ -617,7 +642,7 @@ function switchPreclean() {
   recordSample();
   settings.preclean = !settings.preclean;
   if (seconds >= RUN_LENGTH) restartTimeline();
-  plot = 'growth';
+  if (plot !== 'zones') plot = 'growth';
   pressed(document.querySelector('.plot-nav'), 'plot', plot);
   renderControls();
   compute(true);
@@ -719,6 +744,7 @@ el('lightbox-view').addEventListener('click', (event) => {
   }
 });
 el('lightbox-reset').addEventListener('click', () => lightbox.resetView());
+el('zone-notes').addEventListener('click', showZoneNotes);
 el('chamber-labels').addEventListener('click', (event) => {
   const button = event.currentTarget;
   const show = button.getAttribute('aria-pressed') !== 'true';

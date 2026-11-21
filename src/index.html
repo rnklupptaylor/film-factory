@@ -111,6 +111,7 @@
           <button type="button" data-plot="source" aria-pressed="false">Source</button>
           <button type="button" data-plot="morphology" aria-pressed="false">Morphology</button>
           <button type="button" data-plot="lightbox" aria-pressed="false">Lightbox</button>
+          <button type="button" data-plot="zones" aria-pressed="false">Zone model</button>
           <button type="button" data-plot="diagnostics" aria-pressed="false">Sensors</button>
         </nav>
         <div id="graphic" class="graphic"></div>
@@ -146,6 +147,16 @@
           </div>
           <canvas id="film-lightbox" class="micrograph" role="img" aria-label="Rotatable coated sample in a lightbox" tabindex="0"></canvas>
           <p id="lightbox-readout" class="instrument-note">Preparing surface…</p>
+        </div>
+        <div id="zone-view" class="zone-view" hidden>
+          <div class="zone-heading">
+            <h3 id="zone-name"></h3>
+            <button type="button" class="button" id="zone-notes">Model notes</button>
+          </div>
+          <p id="zone-subject" class="instrument-note"></p>
+          <div id="zone-chart" class="graphic"></div>
+          <p id="zone-values" class="zone-values"></p>
+          <p id="zone-reading" class="instrument-note"></p>
         </div>
         <div id="sensor-view" class="sensor-view" hidden>
           <nav class="seg" aria-label="Chamber instrument">
@@ -200,6 +211,7 @@
   const morphologyWorkerCode = %%MORPHOLOGY_WORKER%%;
   %%MICROSCOPE.MJS%%
   %%LIGHTBOX.MJS%%
+  %%ZONES.MJS%%
   %%APP.MJS%%
   </script>
 </body>
