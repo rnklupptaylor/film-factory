@@ -18,7 +18,7 @@ const waferCentre = (film) => film[(film.length - 1) / 2];
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
 const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
-const standaloneSettings = matchMedia('(max-width: 479px) and (max-height: 740px)');
+const standaloneSettings = matchMedia('(max-width: 479px) and (max-height: 740px), (min-width: 480px) and (max-width: 970px) and (max-height: 475px)');
 const transport = new ChamberTransport();
 const bareFilm = POSITIONS.map(() => 0);
 

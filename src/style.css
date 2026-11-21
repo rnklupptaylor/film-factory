@@ -374,8 +374,11 @@ dialog::backdrop { background: #0c1935a0; }
   .zone-tick { font-size: 13px; }
   .zone-axis-label { font-size: 14.5px; }
 }
+@container film-results (max-width: 295px) {
+  .plot-nav button { padding-inline: .12rem; font-size: .70rem; }
+}
 @media (max-width: 970px) and (max-height: 655px) {
-  .lab:has(.workspace[data-mobile="plots"] #zone-view:not([hidden])) .metrics,
+  .lab:has(.workspace[data-mobile="plots"] :is(.zone-view, .model-view, .lightbox-view):not([hidden])) .metrics,
   .workspace[data-mobile="plots"] .zone-view:not([hidden]) ~ .plot-caption { display: none; }
 }
 @media (min-width: 480px) and (max-width: 970px) and (max-height: 525px) {
@@ -449,13 +452,22 @@ dialog::backdrop { background: #0c1935a0; }
   #compact-guide { display: block; }
   #compact-preclean { display: block; }
 }
-@media (max-width: 479px) and (max-height: 740px) {
+@media (max-width: 479px) and (max-height: 740px), (min-width: 480px) and (max-width: 970px) and (max-height: 475px) {
   .mobile-nav [data-mobile="settings"] { display: block; }
-  .mobile-nav button { padding-inline: .22rem; font-size: .76rem; }
-  #compact-guide, #enlarge-chamber { display: none; }
-  .workspace[data-mobile="chamber"], .workspace[data-mobile="settings"] { grid-template-rows: minmax(0, 1fr); }
+  .mobile-nav button { flex-basis: auto; padding-inline: .22rem; font-size: .76rem; }
+  #enlarge-chamber { display: none; }
+  .workspace[data-mobile="chamber"], .workspace[data-mobile="settings"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
   .workspace[data-mobile="settings"] .chamber, .workspace[data-mobile="settings"] .results,
   .workspace[data-mobile="chamber"] .controls { display: none; }
-  .workspace[data-mobile="settings"] .controls .panel-header { display: flex; }
   .workspace[data-mobile="settings"] .wafer-control { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .32rem; }
+}
+@media (max-width: 479px) and (max-height: 740px) {
+  #compact-guide { display: none; }
+  .workspace[data-mobile="settings"] .controls .panel-header { display: flex; }
+}
+@media (min-width: 480px) and (max-width: 970px) and (max-height: 475px) {
+  .workspace[data-mobile="settings"] .sliders { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
