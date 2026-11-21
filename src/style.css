@@ -132,6 +132,7 @@ h1, h2, p, dl, dd { margin: 0; }
 .seg button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 .technique-nav { align-self: center; }
 .mobile-nav { display: none; }
+.mobile-nav [data-mobile="settings"] { display: none; }
 #compact-guide { display: none; }
 .workspace { display: grid; grid-template-columns: minmax(220px, .78fr) minmax(0, 1.55fr) minmax(290px, 1.13fr); gap: .6rem; min-height: 0; min-width: 0; }
 .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: .54rem; padding: .72rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
@@ -346,12 +347,17 @@ dialog::backdrop { background: #0c1935a0; }
 }
 @media (max-width: 480px) {
   .experiment-bar { gap: .4rem; }
-  .experiment-bar:has(#growth-transport:not([hidden])) { flex-wrap: wrap; }
-  .experiment-bar:has(#growth-transport:not([hidden])) .transport { flex-basis: 100%; }
+  .transport { grid-template-columns: auto auto auto; justify-content: end; gap: .24rem; }
+  .transport progress, .transport .run-status { display: none; }
+  .transport .button { min-width: 0; min-height: 30px; padding-inline: .33rem; white-space: nowrap; }
   .preview-duration { grid-template-columns: minmax(0, 1fr) 5ch; gap: .04rem .3rem; font-size: .74rem; }
   .preview-duration > span { grid-column: 1; }
   .preview-duration input { grid-column: 1 / -1; grid-row: 2; height: 19px; }
   .preview-duration output { grid-column: 2; grid-row: 1; font-size: .75rem; }
+}
+@media (max-width: 300px) {
+  .experiment-bar:has(#growth-transport:not([hidden])) { flex-wrap: wrap; }
+  .experiment-bar:has(#growth-transport:not([hidden])) .transport { flex-basis: 100%; justify-content: space-between; }
 }
 @media (max-width: 360px) {
   .plot-nav button { font-size: .73rem; padding-inline: .20rem; }
@@ -442,4 +448,14 @@ dialog::backdrop { background: #0c1935a0; }
   .controls .panel-header, .chamber .panel-header { display: none; }
   #compact-guide { display: block; }
   #compact-preclean { display: block; }
+}
+@media (max-width: 479px) and (max-height: 740px) {
+  .mobile-nav [data-mobile="settings"] { display: block; }
+  .mobile-nav button { padding-inline: .22rem; font-size: .76rem; }
+  #compact-guide, #enlarge-chamber { display: none; }
+  .workspace[data-mobile="chamber"], .workspace[data-mobile="settings"] { grid-template-rows: minmax(0, 1fr); }
+  .workspace[data-mobile="settings"] .chamber, .workspace[data-mobile="settings"] .results,
+  .workspace[data-mobile="chamber"] .controls { display: none; }
+  .workspace[data-mobile="settings"] .controls .panel-header { display: flex; }
+  .workspace[data-mobile="settings"] .wafer-control { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .32rem; }
 }

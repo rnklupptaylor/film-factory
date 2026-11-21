@@ -18,6 +18,7 @@ const waferCentre = (film) => film[(film.length - 1) / 2];
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
 const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
+const standaloneSettings = matchMedia('(max-width: 479px) and (max-height: 740px)');
 const transport = new ChamberTransport();
 const bareFilm = POSITIONS.map(() => 0);
 
@@ -157,6 +158,11 @@ function renderControls() {
     button.title = isPreclean() ? 'Switch on the coating source for deposition' : 'Switch off the coating source for Ar⁺ pre-cleaning';
   }
   renderSliders();
+}
+
+function showWorkspace(view) {
+  el('workspace').dataset.mobile = view;
+  pressed(document.querySelector('.mobile-nav'), 'mobile', view);
 }
 
 function renderSliders() {
@@ -701,9 +707,7 @@ document.querySelector('.plot-nav').addEventListener('click', (event) => {
 });
 document.querySelector('.mobile-nav').addEventListener('click', (event) => {
   const target = event.target.closest('[data-mobile]');
-  if (!target) return;
-  el('workspace').dataset.mobile = target.dataset.mobile;
-  pressed(event.currentTarget, 'mobile', target.dataset.mobile);
+  if (target) showWorkspace(target.dataset.mobile);
 });
 el('run').addEventListener('click', switchRun);
 el('experiment-mode').addEventListener('click', (event) => {
@@ -777,6 +781,9 @@ el('theme').addEventListener('click', () => {
 });
 themePreference.addEventListener('change', (event) => { if (!manualTheme) theme(event.matches); });
 compactChamber.addEventListener('change', renderChamber);
+standaloneSettings.addEventListener('change', () => {
+  if (!standaloneSettings.matches && el('workspace').dataset.mobile === 'settings') showWorkspace('chamber');
+});
 window.addEventListener('hashchange', route);
 
 theme(themePreference.matches);

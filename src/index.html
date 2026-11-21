@@ -72,6 +72,7 @@
     </div>
     <p id="summary" class="summary"></p>
     <nav class="seg mobile-nav" aria-label="Workspace view">
+      <button type="button" data-mobile="settings" aria-pressed="false">Settings</button>
       <button type="button" data-mobile="chamber" aria-pressed="true">Chamber</button>
       <button type="button" data-mobile="plots" aria-pressed="false">Film &amp; diagnostics</button>
       <button id="compact-guide" type="button">Try it</button>
@@ -83,7 +84,7 @@
         <div class="selects">
           <label><span>Method</span><select id="variant" aria-label="Method"></select></label>
           <label><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>
-          <label class="wafer-control"><span>Substrate</span><select id="wafer" aria-describedby="substrate-limit"></select><span id="substrate-limit" class="wafer-limit"></span></label>
+          <label class="wafer-control"><span id="substrate-label">Substrate</span><select id="wafer" aria-labelledby="substrate-label" aria-describedby="substrate-limit"></select><span id="substrate-limit" class="wafer-limit"></span></label>
         </div>
         <nav class="seg control-nav" id="control-pages" aria-label="Setting groups"></nav>
         <div id="sliders" class="sliders"></div>
