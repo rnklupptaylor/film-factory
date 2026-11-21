@@ -8,7 +8,9 @@ test('build emits the self-contained app with its teaching version', () => {
   execFileSync(process.execPath, ['tools/build.mjs'], { cwd: root });
   const page = readFileSync(new URL('build/deploy/index.html', root), 'utf8');
   const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
-  assert.match(page, /Coat of Atoms/);
+  assert.match(page, /Film Factory/);
   assert.ok(page.includes(pkg.teachingVersion ?? pkg.version));
   assert.doesNotMatch(page, /%%[A-Z.]+%%|<script[^>]+src=|<link[^>]+stylesheet/i);
+  const script = page.match(/<script>([\s\S]+)<\/script>/)[1];
+  assert.doesNotThrow(() => new Function(script));
 });
