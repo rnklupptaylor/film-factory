@@ -1,7 +1,7 @@
 {
   "name": "film-factory",
-  "version": "1.1.0",
-  "teachingVersion": "1.1",
+  "version": "1.2.0-dev",
+  "teachingVersion": "1.2-dev",
   "private": true,
   "type": "module",
   "scripts": {
