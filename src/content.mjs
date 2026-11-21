@@ -27,7 +27,7 @@ export const VARIANTS = {
   pulsed: { family: 'sputtering', name: 'Pulsed DC magnetron', hardware: 'Pulsed DC cathode', materials: ['Al','Ti','Cu','Cr','Ag','Au'], duty: true, defaults: { energy: 450, current: .42, duty: 70 }, prompt: 'Change the duty cycle while holding the on-current fixed. During the off interval, surface charge can clear.' },
   rf: { family: 'sputtering', name: 'RF magnetron · 13.56 MHz', hardware: 'RF cathode with DC self-bias', materials: ['SiO2','Al','Ti','Cu'], defaults: { energy: 350, current: .25 }, prompt: 'Select fused silica. RF coupling sustains sputtering of an insulating target. Compare its effective rate with that of a metal.' },
   reactive: { family: 'sputtering', name: 'Reactive magnetron · Ti + N₂', hardware: 'Reactive Ti cathode', materials: ['Ti'], reactive: true, defaults: { pressure: -1.4, energy: 450, current: .60, nitrogen: 6, substrate: 520 }, prompt: 'Sweep the N₂ fraction across 5–8% at about 4 Pa total pressure. Watch the target coverage rise and the effective yield fall.' },
-  classic: { family: 'plating', name: 'Classic ion plating', hardware: 'Evaporation source', materials: ['Ag','Cu','Al','Ti'], classic: true, defaults: { pressure: -1.45, bias: 1600, ionCurrent: .14, arrival: 1.8 }, prompt: 'Raise ion current until resputtering overtakes incoming deposition. What happens to the film you already grew?' },
+  classic: { family: 'plating', name: 'Classic ion plating', hardware: 'Evaporation source', materials: ['Ag','Cu','Al','Ti'], classic: true, defaults: { pressure: -1.45, bias: 1600, ionCurrent: .08, arrival: 2.8 }, prompt: 'Raise ion current until resputtering overtakes incoming deposition. What happens to the film you already grew?' },
   arc: { family: 'plating', name: 'Arc ion plating · TiN', hardware: 'Ti cathodic arc in N₂', materials: ['Ti'], arc: true, defaults: { pressure: -2.35, bias: 100, ionCurrent: .65, arrival: 5.5, substrate: 520 }, prompt: 'Increase the negative bias and compare ion energy with net growth. The nitrogen-containing arc preset assumes a TiN film.' },
   ibad: { family: 'plating', name: 'Ion beam assisted deposition', hardware: 'Evaporation source + Ar⁺ gun', materials: ['Ag','Cu','Al','Ti'], ibad: true, defaults: { pressure: -4.7, bias: 150, ionCurrent: .25, arrival: .9 }, prompt: 'Sweep beam energy at fixed beam current. Compare the independent ion gun with the plasma sheath of classic ion plating.' },
 };
@@ -58,9 +58,9 @@ export function controlGroups(config, material) {
   if (config.family === 'sputtering') {
     const energy = ['energy', 'Target ion energy', 'Eᵢ', 100, 600, 5, 'eV'];
     const current = ['current', config.duty ? 'Target on-current' : 'Target ion current', 'Iᵢ', .05, 1, .01, 'A'];
-    const controls = [[energy, current], [pressure, distance, substrate]];
-    if (config.duty) controls.push([['duty', 'Duty cycle', 'D', 20, 100, 1, '%']]);
-    if (config.reactive) controls.push([['nitrogen', 'Nitrogen fraction', 'N₂', 0, 25, .5, '%']]);
+    const controls = [[energy, current], [pressure, distance], [substrate]];
+    if (config.duty) controls[2].push(['duty', 'Duty cycle', 'D', 20, 100, 1, '%']);
+    if (config.reactive) controls[2].push(['nitrogen', 'Nitrogen fraction', 'N₂', 0, 25, .5, '%']);
     return controls;
   }
   const bias = config.ibad ? ['bias', 'Ion beam energy', 'Eᵢ', 20, 600, 5, 'eV']

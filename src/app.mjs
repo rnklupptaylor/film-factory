@@ -10,6 +10,7 @@ const rateNumber = (value) => value !== 0 && Math.abs(value) < .01 ? sci(value) 
 const waferCentre = (film) => film[(film.length - 1) / 2];
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
+const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
 
 let page = 'home';
 let family = 'evaporation';
@@ -93,7 +94,8 @@ function renderControls() {
 
 function renderSliders() {
   const groups = controlGroups(config, material);
-  const names = ['Source', 'Chamber', config.duty ? 'Pulses' : config.reactive ? 'Gas mix' : 'Geometry'];
+  const thirdGroup = config.family === 'plating' ? 'Geometry' : config.duty ? 'Film & pulses' : config.reactive ? 'Film & gas' : 'Film';
+  const names = ['Source', 'Chamber', thirdGroup];
   el('control-pages').innerHTML = groups.map((_, i) => `<button type="button" data-group="${i}" aria-pressed="${i === controlPage}">${names[i]}</button>`).join('');
   el('sliders').innerHTML = groups[controlPage].map(([key, label, symbol, min, max, step, unit]) => {
     const value = controlValue(key, settings[key], unit);
@@ -113,6 +115,7 @@ function setupChamber() {
 }
 
 function renderChamber() {
+  el('chamber-art').firstElementChild.setAttribute('viewBox', compactChamber.matches ? '65 60 510 356' : '0 0 600 474');
   el('chamber-pressure').textContent = `p = ${sci(10 ** settings.pressure)} mbar`;
   el('chamber-particles').innerHTML = particleMarkup(config, settings, sample, motionPreference.matches ? 0 : seconds, running);
   const h = waferCentre(thickness);
@@ -333,6 +336,7 @@ document.querySelector('.mobile-nav').addEventListener('click', (event) => {
 el('run').addEventListener('click', switchRun);
 el('reset').addEventListener('click', () => { resetRun(); compute(); });
 el('guide').addEventListener('click', openGuide);
+el('compact-guide').addEventListener('click', openGuide);
 el('theory').addEventListener('click', () => { renderTheory(); el('dialog').showModal(); });
 el('close').addEventListener('click', () => el('dialog').close());
 el('previous').addEventListener('click', () => { theoryPage--; renderTheory(); });
@@ -342,6 +346,7 @@ el('theme').addEventListener('click', () => {
   theme(document.documentElement.dataset.theme !== 'dark');
 });
 themePreference.addEventListener('change', (event) => { if (!manualTheme) theme(event.matches); });
+compactChamber.addEventListener('change', renderChamber);
 window.addEventListener('hashchange', route);
 
 theme(themePreference.matches);

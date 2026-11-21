@@ -130,6 +130,7 @@ h1, h2, p, dl, dd { margin: 0; }
 .seg button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 .technique-nav { align-self: center; }
 .mobile-nav { display: none; }
+#compact-guide { display: none; }
 .workspace { display: grid; grid-template-columns: minmax(220px, .78fr) minmax(0, 1.55fr) minmax(290px, 1.13fr); gap: .6rem; min-height: 0; min-width: 0; }
 .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: .54rem; padding: .72rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .panel-header { display: flex; align-items: center; justify-content: space-between; min-height: 27px; gap: .3rem; }
@@ -210,7 +211,7 @@ dialog::backdrop { background: #0c1935a0; }
   .selects label { gap: .06rem; font-size: .74rem; }
   select { min-height: 31px; font-size: .85rem; padding-block: .1rem; }
   .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .13rem .5rem; }
-  .slider label { font-size: .76rem; flex-wrap: wrap; gap: .04rem .25rem; }
+  .slider label { display: grid; align-content: start; font-size: .76rem; gap: .05rem; }
   .slider output { font-size: .73rem; }
   .slider input { height: 22px; margin: 0; }
   .hardware-note { display: none; }
@@ -227,6 +228,21 @@ dialog::backdrop { background: #0c1935a0; }
   .primary { min-width: 4.5rem; }
   .run-status { min-width: 0; font-size: .74rem; }
   .clock { font-size: .72rem; }
+}
+@media (max-width: 650px) and (max-height: 655px) {
+  .lab-top h1 { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+  .lab-top .eyebrow { font-size: .8rem; }
+  .topbar { padding-block: .28rem; }
+  .topbar .button { min-height: 30px; }
+  .footer > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg button { min-width: 0; min-height: 26px; padding-inline: .25rem; font-size: .8rem; }
+  .controls .panel-header { display: none; }
+  #compact-guide { display: block; }
+  .selects label { font-size: .71rem; }
+  .slider label { font-size: .72rem; }
+  .metric { padding-block: .07rem; }
+  .metric dt { font-size: .68rem; }
+  .metric dd { font-size: .84rem; }
 }
 @media (max-height: 525px) and (min-width: 480px) {
   .topbar { padding-block: .23rem; }
@@ -247,6 +263,7 @@ dialog::backdrop { background: #0c1935a0; }
   .controls .panel-header .button { min-height: 21px; }
   .selects, .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .16rem .35rem; }
   .selects label, .slider label, .slider output { font-size: .72rem; }
+  .slider label { display: grid; gap: 0; }
   select { min-height: 26px; }
   .slider input { height: 19px; margin: 0; }
   .seg button { min-height: 23px; padding-block: .1rem; }
@@ -265,4 +282,8 @@ dialog::backdrop { background: #0c1935a0; }
   .lab { grid-template-rows: auto minmax(0, 1fr) auto auto; }
   .workspace, .workspace[data-mobile="plots"] { grid-template-columns: minmax(205px,.8fr) minmax(0,1.45fr) minmax(270px,1fr); }
   .workspace[data-mobile="plots"] .controls { display: flex; }
+}
+@media (max-height: 525px) and (min-width: 480px) and (max-width: 970px) {
+  .controls .panel-header, .chamber .panel-header { display: none; }
+  #compact-guide { display: block; }
 }
