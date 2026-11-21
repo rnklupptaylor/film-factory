@@ -352,6 +352,12 @@ dialog::backdrop { background: #0c1935a0; }
   .plot-nav button { min-height: 25px; padding: .12rem .19rem; font-size: .75rem; }
   .lightbox-view .model-toolbar { gap: .18rem; flex-wrap: wrap; }
   .lightbox-view .model-toolbar .seg button { padding-inline: .3rem; }
+  .zone-tick { font-size: 13px; }
+  .zone-axis-label { font-size: 14.5px; }
+}
+@media (max-width: 970px) and (max-height: 655px) {
+  .lab:has(.workspace[data-mobile="plots"] #zone-view:not([hidden])) .metrics,
+  .workspace[data-mobile="plots"] .zone-view:not([hidden]) ~ .plot-caption { display: none; }
 }
 @media (max-width: 650px) and (max-height: 655px) {
   .lab-top h1 { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
