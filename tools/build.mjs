@@ -4,15 +4,21 @@ const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
 const [page, pkg] = await Promise.all([read('src/index.html'), read('package.json')]);
 const { version, teachingVersion = version } = JSON.parse(pkg);
-const includes = ['style.css', 'physics.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'app.mjs'];
+const includes = ['style.css', 'physics.mjs', 'instruments.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'microstructure.mjs', 'microscope.mjs', 'app.mjs'];
+const bundle = (source) => source.replace(/^import\s+.*?\s+from\s+['"][^'"]+['"];\r?\n/gms, '').replace(/^export\s+(?=(?:const|function|class)\s)/gm, '');
 let html = page.replaceAll('%%VERSION%%', teachingVersion);
 for (const name of includes) {
   const marker = `%%${name.toUpperCase()}%%`;
   if (!html.includes(marker)) continue;
   const source = await read(`src/${name}`);
-  const bundled = source.replace(/^import\s+.*?\s+from\s+['"][^'"]+['"];\r?\n/gms, '').replace(/^export\s+(?=(?:const|function|class)\s)/gm, '');
-  html = html.replace(marker, () => bundled);
+  html = html.replace(marker, () => bundle(source));
 }
+const kernel = bundle(await read('src/microstructure.mjs'));
+const worker = `${kernel}\nself.onmessage = ({ data }) => {
+  const model = makeMorphology(data);
+  self.postMessage(model, [model.mesh.buffer, model.tops.buffer]);
+};`;
+html = html.replace('%%MORPHOLOGY_WORKER%%', () => JSON.stringify(worker).replaceAll('<', '\\u003c'));
 const output = new URL('build/deploy/', root);
 await mkdir(output, { recursive: true });
 await writeFile(new URL('index.html', output), html);

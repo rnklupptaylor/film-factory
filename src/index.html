@@ -19,6 +19,7 @@
     </a>
     <span class="course">Thin Film Processing</span>
     <div class="top-actions">
+      <button id="thermal-warning" class="button thermal-warning" type="button" aria-label="Substrate thermal limit exceeded" hidden>⚠ Heat</button>
       <button id="theme" class="button theme" type="button" aria-label="Switch appearance" title="Switch appearance">◐</button>
       <button id="theory" class="button" type="button">Theory</button>
     </div>
@@ -101,9 +102,35 @@
           <button type="button" data-plot="growth" aria-pressed="true">Growth</button>
           <button type="button" data-plot="profile" aria-pressed="false">Profile</button>
           <button type="button" data-plot="source" aria-pressed="false">Source</button>
-          <button type="button" data-plot="section" aria-pressed="false">Section</button>
+          <button type="button" data-plot="morphology" aria-pressed="false">Morphology</button>
+          <button type="button" data-plot="diagnostics" aria-pressed="false">Sensors</button>
         </nav>
         <div id="graphic" class="graphic"></div>
+        <div id="model-view" class="model-view" hidden>
+          <div class="model-toolbar">
+            <nav class="seg" aria-label="Morphology time">
+              <button type="button" data-model="preview" aria-pressed="true">Preview</button>
+              <button type="button" data-model="actual" aria-pressed="false">This run</button>
+            </nav>
+            <nav class="seg" aria-label="Morphology camera">
+              <button type="button" data-camera="tilt" aria-pressed="true">Tilt</button>
+              <button type="button" data-camera="top" aria-pressed="false">Top</button>
+            </nav>
+          </div>
+          <canvas id="micrograph" class="micrograph" role="img" aria-label="Simulated film morphology" tabindex="0"></canvas>
+          <p id="model-readout" class="instrument-note">Preparing surface…</p>
+        </div>
+        <div id="sensor-view" class="sensor-view" hidden>
+          <nav class="seg" aria-label="Chamber instrument">
+            <button type="button" data-sensor="qcm" aria-pressed="true">QCM</button>
+            <button type="button" data-sensor="vacuum" aria-pressed="false">Vacuum</button>
+            <button type="button" data-sensor="plasma" aria-pressed="false">Plasma</button>
+          </nav>
+          <div id="sensor-body" class="sensor-body"></div>
+          <label id="qcm-tooling" class="tooling"><span>Tooling factor <output id="tooling-value" for="tooling">100%</output></span>
+            <input id="tooling" type="range" min="50" max="200" value="100" step="1">
+          </label>
+        </div>
         <p id="plot-caption" class="plot-caption"></p>
       </section>
     </div>
@@ -137,10 +164,14 @@
   <script>
   'use strict';
   %%PHYSICS.MJS%%
+  %%INSTRUMENTS.MJS%%
   %%CONTENT.MJS%%
   %%GRAPHICS.MJS%%
   %%CHAMBER.MJS%%
   %%TRANSPORT.MJS%%
+  %%MICROSTRUCTURE.MJS%%
+  const morphologyWorkerCode = %%MORPHOLOGY_WORKER%%;
+  %%MICROSCOPE.MJS%%
   %%APP.MJS%%
   </script>
 </body>

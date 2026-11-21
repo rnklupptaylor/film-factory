@@ -1,8 +1,11 @@
-import { MATERIALS, POSITIONS, rates, morphology, advanceFilm, residueAfter } from './physics.mjs';
+import { MATERIALS, POSITIONS, rates, advanceFilm, residueAfter } from './physics.mjs';
 import { TECHNIQUES, VARIANTS, RUN_LENGTH, THEORY, controlGroups, newSettings, sourceChart } from './content.mjs';
-import { sci, chartMarkup, growthPlot, profilePlot, sectionMarkup } from './graphics.mjs';
+import { sci, chartMarkup, growthPlot, profilePlot } from './graphics.mjs';
 import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
+import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gasReadings, pressureGauge } from './instruments.mjs';
+import { growthConditions } from './microstructure.mjs';
+import { FilmMicroscope } from './microscope.mjs';
 
 const el = (id) => document.getElementById(id);
 const option = (value, label) => `<option value="${value}">${label}</option>`;
@@ -36,6 +39,12 @@ let lastRender = 0;
 let frame = 0;
 let manualTheme = false;
 let chamber;
+let microscope;
+let modelMode = 'auto', sensorMode = 'qcm', tooling = 100;
+let growthLog = [], growthDuration = 0, growthReference = 0, modelRun = 0;
+let qcmMass = 0, qcmThickness = 0, qcmHistory = [[0,0]];
+let growthInput = growthConditions(config, settings, sample);
+let crystalInput = crystalReading(config, settings, sample);
 const isPreclean = () => config.classic && settings.preclean;
 
 function route() {
@@ -43,6 +52,7 @@ function route() {
   el('home').hidden = page !== 'home';
   el('pvd').hidden = page !== 'pvd';
   if (page === 'home' && running) pause();
+  renderThermalWarning();
   document.title = page === 'pvd' ? 'The Atom Shop (PVD) · Film Factory' : 'Film Factory';
 }
 
@@ -59,15 +69,39 @@ function chooseTechnique(next) {
 }
 
 function chooseVariant(next) {
+  const wafer = settings.wafer;
   variant = next;
   config = VARIANTS[variant];
   settings = newSettings(variant);
+  settings.wafer = wafer;
   material = MATERIALS[settings.symbol];
   controlPage = 0;
   transport.clear();
   resetRun();
   renderControls();
   compute(true);
+}
+
+function renderThermalWarning() {
+  const status = substrateStatus(settings);
+  const warning = el('thermal-warning');
+  warning.hidden = page !== 'pvd' || !status.hot;
+  warning.title = `${settings.substrate} K exceeds the ${Math.round(status.limit)} K reference for ${status.name}`;
+  const limit = el('substrate-limit');
+  if (limit) {
+    limit.textContent = status.hot ? `Above thermal reference (${Math.round(status.limit)} K)` : `Thermal reference ${Math.round(status.limit)} K`;
+    limit.classList.toggle('above-limit', status.hot);
+  }
+}
+
+function showThermalDetails() {
+  const status = substrateStatus(settings);
+  el('dialog-title').textContent = 'Substrate thermal reference';
+  el('dialog-content').innerHTML = `<p><strong>${status.name}</strong> at ${settings.substrate} K exceeds the selected ${Math.round(status.limit)} K reference.</p>
+    <p>${status.basis}. The simulation still shows an intact substrate. Fixture limits, load, exposure time and grade can lower usable temperatures.</p>
+    <a href="${status.url}" target="_blank" rel="noopener noreferrer">Material data</a>`;
+  el('dialog-nav').hidden = true;
+  el('dialog').showModal();
 }
 
 function chooseMaterial(symbol) {
@@ -112,12 +146,17 @@ function renderSliders() {
   const thirdGroup = config.family === 'plating' ? 'Geometry' : config.duty ? 'Film & pulses' : config.reactive ? 'Film & gas' : 'Film';
   const names = ['Source', 'Chamber', thirdGroup];
   el('control-pages').innerHTML = groups.map((_, i) => `<button type="button" data-group="${i}" aria-pressed="${i === controlPage}">${names[i]}</button>`).join('');
-  el('sliders').innerHTML = groups[controlPage].map(([key, label, symbol, min, max, step, unit]) => {
+  const controls = groups[controlPage];
+  el('sliders').innerHTML = controls.map(([key, label, symbol, min, max, step, unit]) => {
     const disabled = isPreclean() && key === 'arrival';
     const value = disabled ? 'Source off' : controlValue(key, settings[key], unit);
     return `<div class="slider"><label for="setting-${key}"><span>${label} <i>${symbol}</i></span><output id="value-${key}" for="setting-${key}">${value}</output></label>
       <input id="setting-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" data-key="${key}" data-unit="${unit}" aria-valuetext="${value}" ${disabled ? 'disabled' : ''}></div>`;
-  }).join('');
+  }).join('') + (controls.some(([key]) => key === 'substrate')
+    ? `<label class="wafer-control"><span>Substrate</span><select id="wafer" aria-describedby="substrate-limit">${Object.entries(SUBSTRATES).map(([id, substrate]) => option(id, substrate.name)).join('')}</select><span id="substrate-limit" class="wafer-limit"></span></label>`
+    : '');
+  if (el('wafer')) el('wafer').value = settings.wafer;
+  renderThermalWarning();
 }
 
 function setupChamber() {
@@ -128,7 +167,7 @@ function setupChamber() {
   ctx?.scale(2, 2);
   chamber = {
     svg: art.firstElementChild, ctx, power: el('chamber-power'),
-    pressure: el('chamber-pressure'), bias: el('chamber-bias'),
+    pressure: el('chamber-pressure'), gauge: el('chamber-gauge-type'), bias: el('chamber-bias'),
     film: el('in-chamber-film'), residue: el('surface-residue'), heat: art.querySelectorAll('.heat-active'),
     plasma: el('plasma-glow'), beam: el('electron-guide'),
   };
@@ -142,7 +181,8 @@ function setupChamber() {
 
 function renderChamber() {
   chamber.svg.setAttribute('viewBox', compactChamber.matches ? '5 39 609 422' : '0 0 620 465');
-  chamber.pressure.textContent = `p = ${sci(10 ** settings.pressure)} mbar`;
+  chamber.pressure.textContent = (10 ** settings.pressure).toExponential(2).replace('-', '−');
+  chamber.gauge.textContent = pressureGauge(settings) === 'Cold-cathode gauge' ? 'Cold cathode' : 'Capacitance';
   if (chamber.bias) chamber.bias.textContent = `${settings.bias ? '−' : ''}${settings.bias} V`;
   drawChamberSurface();
   drawChamberMotion();
@@ -236,7 +276,82 @@ function renderResiduePlot() {
   };
 }
 
+function renderMorphology() {
+  if (!microscope) {
+    microscope = new FilmMicroscope(el('micrograph'), el('model-readout'), morphologyWorkerCode);
+    el('model-view').querySelectorAll('[data-camera]').forEach((button) => { button.disabled = !microscope.gpu; });
+  }
+  const mode = modelMode === 'auto' ? (growthDuration ? 'actual' : 'preview') : modelMode;
+  pressed(el('model-view'), 'model', mode);
+  const preview = mode === 'preview';
+  const key = preview ? `preview|${JSON.stringify(growthInput)}`
+    : `actual|${modelRun}|${running ? Math.floor(growthDuration / 2) : growthDuration}`;
+  const segments = preview ? [{ ...growthInput, duration: RUN_LENGTH }] : growthLog;
+  const reference = preview ? growthInput.gross * RUN_LENGTH : growthReference;
+  microscope.request(key, segments.map(part => ({...part})), reference);
+  const theta = growthInput.theta == null ? '' : ` · Tₛ/Tₘ ${number(growthInput.theta)}`;
+  el('plot-meta').textContent = `${preview ? '60 s forecast' : 'Accumulated film'}${theta}`;
+  el('plot-caption').textContent = substrateStatus(settings).hot
+    ? 'Above the substrate thermal reference. The model still assumes an intact substrate.'
+    : `${microscope.gpu ? 'SEM-style contrast. Drag or use arrow keys to rotate.' : 'Surface height map. 3D rendering is unavailable on this device.'} Coarse model.`;
+}
+
+function instrumentCards(readings) {
+  return `<dl class="sensor-grid">${readings.map(([label,value]) => `<div class="sensor-reading"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
+}
+
+function renderInstruments() {
+  const body = el('sensor-body');
+  el('qcm-tooling').hidden = sensorMode !== 'qcm';
+  if (sensorMode === 'qcm') {
+    el('plot-meta').textContent = '6 MHz quartz';
+    const shift = crystalFrequencyShift(qcmMass);
+    const observed = [...qcmHistory, [seconds,shift]];
+    const end = crystalFrequencyShift(qcmMass + crystalInput.massRate * (RUN_LENGTH - seconds));
+    const ymin = Math.min(-1, shift, end, ...qcmHistory.map(point => point[1])) * 1.08;
+    body.innerHTML = instrumentCards([
+      ['Frequency shift Δf', `${number(shift, 1)} Hz`],
+      ['Areal mass', `${number(qcmMass * 1e5, 2)} µg/cm²`],
+      ['QCM indicated h', `${number(qcmThickness * tooling / 100, 1)} nm`],
+      ['Wafer net h', `${number(waferCentre(thickness), 1)} nm`],
+    ]) + `<div class="graphic">${chartMarkup({ title:'Quartz frequency shift', xLabel:'Time t (s)', yLabel:'Δf (Hz)',
+      xDomain:[0,RUN_LENGTH], yDomain:[ymin,0],
+      lines:[{points:observed},{points:[[seconds,shift],[RUN_LENGTH,end]],dashed:true}], marker:[seconds,shift] })}</div>`;
+    el('tooling-value').value = `${tooling}%`;
+    el('plot-caption').textContent = Math.abs(shift) > 60000
+      ? 'Heavy crystal loading. The linear Sauerbrey estimate is less reliable in this range.'
+      : 'The shielded, off-axis crystal measures incoming mass. Tooling corrects geometry. The biased wafer can lose film by resputtering.';
+    return;
+  }
+  if (sensorMode === 'vacuum') {
+    const readout = gasReadings(config, settings);
+    el('plot-meta').textContent = 'Chamber & holder';
+    body.innerHTML = instrumentCards([
+      [pressureGauge(settings), `${sci(readout.total)} mbar`],
+      ['Holder thermocouple', `${settings.substrate} K`],
+      ...readout.gases.map(([gas, pressure]) => [`RGA · p(${gas})`, pressure ? `${sci(pressure)} mbar` : '0 mbar']),
+    ]) + `<p class="instrument-note">${readout.gases.length ? 'Partial pressures follow the configured gas mix. Process pressures require a differentially pumped RGA inlet.' : readout.localGas ?? 'Residual gas composition is unspecified for this preset.'}</p>`;
+    el('plot-caption').textContent = 'Ideal readouts. The thermocouple is attached to the holder and follows the selected Tₛ.';
+    return;
+  }
+  el('plot-meta').textContent = 'Discharge';
+  const readings = [];
+  if (family === 'sputtering') readings.push(['Effective target ion current', `${number(running ? settings.current * (config.duty ? settings.duty / 100 : 1) : 0)} A`]);
+  if (family === 'plating') readings.push(['Substrate ion current density', `${number(running ? settings.ionCurrent : 0)} mA/cm²`]);
+  if (config.reactive) readings.push(['OES · Relative Ti emission', running ? `${number(100 * (1 - .63 * sample.poisoning), 1)}%` : 'Off']);
+  body.innerHTML = instrumentCards(readings) + `<p class="instrument-note">${config.reactive
+    ? 'The Ti emission proxy follows the modelled metal yield at fixed discharge conditions.'
+    : family === 'evaporation' ? 'The evaporation preset has no plasma discharge.'
+      : 'Select reactive Ti sputtering to monitor a modelled optical emission signal.'}</p>`;
+  el('plot-caption').textContent = 'Optical emission spectroscopy (OES) looks through a viewport. The Ti reading is relative to the metallic target state.';
+}
+
 function renderPlot() {
+  el('model-view').hidden = plot !== 'morphology';
+  el('sensor-view').hidden = plot !== 'diagnostics';
+  el('graphic').hidden = plot === 'morphology' || plot === 'diagnostics';
+  if (plot === 'morphology') { renderMorphology(); return; }
+  if (plot === 'diagnostics') { renderInstruments(); return; }
   let view;
   if (plot === 'growth' && isPreclean()) {
     view = renderResiduePlot();
@@ -248,15 +363,8 @@ function renderPlot() {
     const centre = waferCentre(forecast);
     const edge = centre > 0 ? `Projected edge / centre ${number(forecast[0] / centre * 100, 0)}%.` : 'The projected wafer is bare.';
     view = { title: '100 mm wafer', markup: profilePlot(thickness, forecast), caption: seconds < RUN_LENGTH ? `Solid line shows the current film. ${edge}` : `Final thickness across the wafer. ${edge.replace('Projected edge', 'Edge')}` };
-  } else if (plot === 'source') {
-    view = renderSource();
   } else {
-    const shape = isPreclean() ? { name: 'Ar⁺ pre-cleaning', type: 'plain' } : morphology(config, sample, settings.pressure);
-    const label = isPreclean() ? 'Source off' : sample.theta === undefined ? sample.film.name : `Tₛ/Tₘ = ${number(sample.theta)}`;
-    view = { title: label, markup: sectionMarkup(shape, waferCentre(thickness), sample.film.colour,
-        isPreclean() ? 'Ar⁺ bombards the exposed substrate' : undefined),
-      caption: isPreclean() ? 'The discharge can sputter existing material while the evaporation source is off.'
-        : family === 'plating' ? `${number(sample.ionDose, 1)} eV per arriving film unit. Current growth conditions, schematic.` : 'Schematic of the current growth conditions. Grain sizes are illustrative.' };
+    view = renderSource();
   }
   el('plot-meta').textContent = view.title;
   el('graphic').innerHTML = view.markup;
@@ -266,8 +374,12 @@ function renderPlot() {
 function compute(rebuild = false) {
   const formerFilm = sample.film;
   sample = rates(config, settings, material);
+  const conditions = growthConditions(config, settings, sample);
+  if (JSON.stringify(growthInput) !== JSON.stringify(conditions)) growthInput = conditions;
+  crystalInput = crystalReading(config, settings, sample);
   if (rebuild || formerFilm !== sample.film) setupChamber();
   renderChamber();
+  renderThermalWarning();
   renderMetrics();
   renderPlot();
 }
@@ -288,6 +400,7 @@ function restartTimeline() {
   lastRender = 0;
   history = [[0, waferCentre(thickness)]];
   residueHistory = [[0, residue * 100]];
+  qcmHistory = [[0, crystalFrequencyShift(qcmMass)]];
   renderClock();
   setRunLabel('Ready', 'Run');
 }
@@ -295,6 +408,12 @@ function restartTimeline() {
 function resetRun() {
   thickness = POSITIONS.map(() => 0);
   residue = 1;
+  growthLog = [];
+  growthDuration = 0;
+  growthReference = 0;
+  modelMode = 'auto';
+  modelRun++;
+  qcmMass = qcmThickness = 0;
   restartTimeline();
   scheduleFrame();
 }
@@ -311,10 +430,23 @@ function recordSample() {
   if (seconds <= history.at(-1)[0]) return;
   history.push([seconds, waferCentre(thickness)]);
   residueHistory.push([seconds, residue * 100]);
+  qcmHistory.push([seconds, crystalFrequencyShift(qcmMass)]);
 }
 
 function trackFilm(elapsed, now) {
   const dt = Math.min(elapsed * 5, RUN_LENGTH - seconds);
+  if (dt > 0) {
+    let part = growthLog.at(-1);
+    if (part?.input !== growthInput) {
+      part = { input: growthInput, ...growthInput, duration: 0 };
+      growthLog.push(part);
+    }
+    part.duration += dt;
+    growthDuration += dt;
+    if (!growthReference && growthInput.gross) growthReference = growthInput.gross * RUN_LENGTH;
+    qcmMass += dt * crystalInput.massRate;
+    qcmThickness += dt * crystalInput.thicknessRate;
+  }
   if (isPreclean()) residue = residueAfter(residue, sample, dt, waferCentre(thickness));
   thickness = advanceFilm(thickness, sample, dt);
   seconds += dt;
@@ -355,6 +487,7 @@ function switchRun() {
   if (seconds >= RUN_LENGTH) resetRun();
   running = true;
   setRunLabel('Running · 5×', 'Pause');
+  if (plot === 'diagnostics') renderInstruments();
   scheduleFrame();
 }
 
@@ -420,6 +553,12 @@ el('sliders').addEventListener('input', (event) => {
   control.setAttribute('aria-valuetext', value);
   compute(key === 'distance');
 });
+el('sliders').addEventListener('change', (event) => {
+  if (event.target.id !== 'wafer') return;
+  settings.wafer = event.target.value;
+  resetRun();
+  compute();
+});
 document.querySelector('.plot-nav').addEventListener('click', (event) => {
   const target = event.target.closest('[data-plot]');
   if (!target) return;
@@ -434,6 +573,27 @@ document.querySelector('.mobile-nav').addEventListener('click', (event) => {
   pressed(event.currentTarget, 'mobile', target.dataset.mobile);
 });
 el('run').addEventListener('click', switchRun);
+el('thermal-warning').addEventListener('click', showThermalDetails);
+el('model-view').addEventListener('click', (event) => {
+  if (event.target.dataset.model) {
+    modelMode = event.target.dataset.model;
+    renderMorphology();
+  }
+  if (event.target.dataset.camera) {
+    microscope.setView(event.target.dataset.camera);
+    pressed(el('model-view'), 'camera', event.target.dataset.camera);
+  }
+});
+el('sensor-view').addEventListener('click', (event) => {
+  if (!event.target.dataset.sensor) return;
+  sensorMode = event.target.dataset.sensor;
+  pressed(el('sensor-view'), 'sensor', sensorMode);
+  renderInstruments();
+});
+el('tooling').addEventListener('input', (event) => {
+  tooling = Number(event.target.value);
+  renderInstruments();
+});
 el('reset').addEventListener('click', () => { resetRun(); compute(); });
 el('guide').addEventListener('click', openGuide);
 el('compact-guide').addEventListener('click', openGuide);

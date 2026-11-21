@@ -13,4 +13,10 @@ test('build emits the self-contained app with its teaching version', () => {
   assert.doesNotMatch(page, /%%[A-Z.]+%%|<script[^>]+src=|<link[^>]+stylesheet/i);
   const script = page.match(/<script>([\s\S]+)<\/script>/)[1];
   assert.doesNotThrow(() => new Function(script));
+  const worker = JSON.parse(script.match(/^\s*const morphologyWorkerCode = (.+);$/m)[1]);
+  let result;
+  const scope = { postMessage: (model) => { result = model; } };
+  new Function('self', worker)(scope);
+  scope.onmessage({ data: { segments: [] } });
+  assert.equal(result.coverage, 0);
 });

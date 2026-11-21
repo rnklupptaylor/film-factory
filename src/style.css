@@ -79,6 +79,7 @@ h1, h2, p, dl, dd { margin: 0; }
 }
 .button:hover, select:hover { border-color: var(--accent); }
 .button:disabled { opacity: .48; cursor: default; }
+.thermal-warning { color: #752c09; background: #ffe3c3; border-color: #e6a457; }
 .theme { font-size: 1rem; min-width: 36px; }
 .primary { color: var(--on-accent); background: var(--accent); border-color: var(--accent); min-width: 6rem; }
 .footer {
@@ -194,6 +195,28 @@ select {
 .plot-caption { color: var(--muted); font-size: .82rem; min-height: 2.25em; }
 .chart text { fill: var(--muted); font: 13px system-ui, sans-serif; }
 .chart text.major { fill: var(--ink); font-weight: 690; }
+.gauge-label, .gauge-unit { fill: #c8d8e6; font: 10px system-ui, sans-serif; }
+.gauge-digits { fill: #9af4cc; font: 690 11px var(--mono); }
+.chamber-sensor text { fill: #c9d8e8; font: 690 12px system-ui, sans-serif; }
+.model-view, .sensor-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .45rem; }
+.model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .25rem; }
+.model-toolbar .seg button, .sensor-view .seg button { padding: .2rem .43rem; min-height: 26px; }
+.micrograph { width: 100%; flex: 1; min-height: 0; display: block; background: #141619; border-radius: 7px; cursor: grab; touch-action: none; }
+.micrograph:active { cursor: grabbing; }
+.instrument-note { font-size: .79rem; color: var(--muted); }
+.sensor-body { display: flex; flex-direction: column; gap: .32rem; flex: 1; min-height: 0; }
+.sensor-body .graphic { border: 1px solid var(--line); }
+.sensor-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .33rem; }
+.sensor-reading { border: 1px solid var(--line); min-width: 0; border-radius: 7px; padding: .33rem .42rem; }
+.sensor-reading dt { color: var(--muted); font-size: .74rem; }
+.sensor-reading dd { font: 680 .91rem/1.35 var(--mono); }
+.tooling { color: var(--muted); font-size: .8rem; }
+.tooling span { display: flex; justify-content: space-between; }
+.tooling input { display: block; width: 100%; margin: 0; accent-color: var(--accent); }
+.wafer-control { display: grid; gap: .14rem; font-size: .82rem; color: var(--muted); }
+.wafer-limit { color: var(--muted); font-size: .75rem; }
+.wafer-limit.above-limit { color: #b94b19; font-weight: 720; }
+:root[data-theme="dark"] .wafer-limit.above-limit { color: #ffb078; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-width: 0; }
 .metric { min-width: 0; padding: .35rem .74rem; }
 .metric + .metric { border-left: 1px solid var(--line); }
@@ -222,7 +245,7 @@ dialog::backdrop { background: #0c1935a0; }
 @media (max-width: 650px) {
   #preclean { display: none; }
   #compact-preclean { display: block; }
-  .topbar { padding: .4rem .65rem; }
+  .topbar { gap: .35rem; padding: .4rem .65rem; }
   .course { display: none; }
   .footer { padding: .25rem .65rem; font-size: .67rem; }
   .lab { padding: .5rem .55rem 0; gap: .34rem; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
@@ -248,6 +271,8 @@ dialog::backdrop { background: #0c1935a0; }
   .slider label { display: grid; align-content: start; font-size: .76rem; gap: .05rem; }
   .slider output { font-size: .73rem; }
   .slider input { height: 22px; margin: 0; }
+  .wafer-control { grid-column: 1 / -1; }
+  .wafer-limit { display: none; }
   .hardware-note { display: none; }
   .legend { gap: .55rem; font-size: .73rem; }
   #enlarge-chamber { display: block; min-height: 23px; padding: .08rem .29rem; font-size: .7rem; }
@@ -264,6 +289,13 @@ dialog::backdrop { background: #0c1935a0; }
   .primary { min-width: 4.5rem; }
   .run-status { min-width: 0; font-size: .74rem; }
   .clock { font-size: .72rem; }
+}
+@media (max-width: 360px) {
+  .plot-nav button { font-size: .73rem; padding-inline: .20rem; }
+  .topbar .brand { gap: .35rem; font-size: 1.05rem; }
+  .top-actions { gap: .25rem; }
+  .topbar .button { padding-inline: .34rem; }
+  .thermal-warning { white-space: nowrap; }
 }
 @media (max-width: 650px) and (max-height: 655px) {
   .lab-top h1 { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }

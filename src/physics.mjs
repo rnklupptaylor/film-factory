@@ -124,22 +124,3 @@ export function residueAfter(fraction, sample, seconds, filmAtCentre = 0) {
 export function advanceFilm(thickness, sample, seconds) {
   return thickness.map((value, i) => Math.max(0, value + (sample.localGross[i] - sample.loss) * seconds));
 }
-
-export function morphology(config, sample, pressure) {
-  if (config.family === 'plating') {
-    if (sample.net <= 0) return { name: 'Resputtering dominates', type: 'etch' };
-    if (sample.ionDose < 5) return { name: 'Weak ion assistance', type: 'columnar' };
-    if (sample.ionDose < 90) return { name: 'Ion-assisted growth', type: 'dense' };
-    return { name: 'Strong bombardment', type: 'dense' };
-  }
-  if (sample.theta === undefined) return { name: 'Cross-section schematic', type: 'plain' };
-  if (sample.theta >= .64) return { name: 'Zone 3 · Equiaxial', type: 'equiaxial' };
-  if (config.family === 'evaporation') {
-    if (sample.theta >= .32) return { name: 'Zone 2 · Columnar', type: 'columnar' };
-  } else {
-    const gasShift = .045 * (pressure + 3);
-    if (sample.theta >= .42 + gasShift) return { name: 'Zone 2 · Columnar', type: 'columnar' };
-    if (sample.theta >= .22 + gasShift) return { name: 'Zone T · Fibrous', type: 'dense' };
-  }
-  return { name: 'Zone 1 · Porous tapered grains', type: 'porous' };
-}

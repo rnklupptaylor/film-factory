@@ -14,15 +14,18 @@ function earth(x, y) {
   return `<path class="ground-wire" d="M${x} ${y}v6m-8 0h16m-12 4h8m-6 4h4"/>`;
 }
 
-function supply(x, y, title, first, second, type, id = '') {
+function supply(x, y, title, first, second, type, id = '', wiring = 'ground') {
+  const ground = wiring === 'ground';
+  const contacts = ground ? `<circle cx="${x}" cy="${y + 39}" r="3.3"/>
+    <circle cx="${x + 80}" cy="${y + 70}" r="3.3"/>`
+    : `<circle cx="${x + 27}" cy="${y + 70}" r="3.3"/><circle cx="${x + 75}" cy="${y + 70}" r="3.3"/>`;
   return `<g class="supply ${type}">
     <rect x="${x}" y="${y}" width="105" height="70" rx="8"/>
     <text class="supply-title" x="${x + 12}" y="${y + 22}">${title}</text>
-    <circle cx="${x}" cy="${y + 39}" r="3.3"/>
-    <circle cx="${x}" cy="${y + 58}" r="3.3"/>
+    ${contacts}
     <text x="${x + 10}" y="${y + 44}" ${id ? `id="${id}"` : ''}>${first}</text>
     <text x="${x + 10}" y="${y + 63}">${second}</text>
-  </g>`;
+  </g>${ground ? `<path class="ground-wire" d="M${x + 80} ${y + 73}v5"/>${earth(x + 80, y + 78)}` : ''}`;
 }
 
 function terminal(x, y, sign, type = 'voltage') {
@@ -33,8 +36,7 @@ function circuitMarkup(config, method, y, preclean) {
   const biased = config.classic || config.arc;
   const groundedSubstrate = `<path class="ground-wire" d="M300 81V51h-67"/>${earth(233, 51)}
     <text class="chamber-label minor" x="202" y="58">0 V</text>`;
-  const bias = `<path class="voltage-wire" d="M300 81V49h176v37h27"/>
-    <path class="ground-wire" d="M503 105h-14"/>${earth(489, 105)}
+  const bias = `<path class="voltage-wire" d="M300 81V48h196v38h7"/>
     ${supply(503, 47, 'Substrate bias', '− Vₛ', '+ return', 'voltage', 'chamber-bias')}
     ${terminal(410, 128, '−')}`;
   const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/><path d="M300 64v54"/></g>`;
@@ -42,32 +44,64 @@ function circuitMarkup(config, method, y, preclean) {
     <text class="chamber-label minor" x="9" y="354">${config.diode ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
   const yBox = 326;
   const yTop = yBox + 39;
-  const yBottom = yBox + 58;
   let source;
   if (config.family === 'sputtering' || config.arc) {
     const title = method === 'rf' ? 'RF supply' : method === 'pulsed' ? 'Pulsed DC' : config.arc ? 'Arc supply' : config.diode ? 'DC diode HV' : 'DC supply';
     const outgoing = method === 'rf'
-      ? `<path class="voltage-wire" d="M300 ${y + 20}V416h109m13 0h62v-${416 - yTop}h19m-94 41v20m13-20v20"/>`
-      : `<path class="voltage-wire" d="M300 ${y + 20}V416h184v-${416 - yTop}h19"/>`;
+      ? `<path class="voltage-wire" d="M300 ${y + 20}V416h109m13 0h75v-${416 - yTop}h6m-94 41v20m13-20v20"/>`
+      : `<path class="voltage-wire" d="M300 ${y + 20}V416h197v-${416 - yTop}h6"/>`;
     const targetLabel = method === 'rf' ? '− self-bias' : config.arc ? '− Ti cathode' : '− target';
-    source = `${outgoing}<path class="ground-wire" d="M503 ${yBottom}h-9"/>${earth(494, yBottom)}
+    source = `${outgoing}
       ${supply(503, yBox, title, method === 'rf' ? '~ 13.56 MHz' : config.diode ? '−2.5 kV' : '− cathode', method === 'rf' ? '0 V return' : '+ return', 'voltage')}
       <text class="electrode-label" x="386" y="${y + 9}">${targetLabel}</text>`;
   } else if (method === 'ebeam') {
-    source = `<path class="voltage-wire" d="M400 ${y + 25}V416h84v-${416 - yTop}h19"/>
-      <path class="ground-wire" d="M503 ${yBottom}h-9M300 ${y + 15}v32"/>${earth(494, yBottom)}${earth(300, y + 47)}
+    source = `<path class="voltage-wire" d="M400 ${y + 25}V416h97v-${416 - yTop}h6"/>
+      <path class="ground-wire" d="M300 ${y + 15}v32"/>${earth(300, y + 47)}
       ${supply(503, yBox, 'E-beam HV', '− gun', '+ hearth', 'voltage')}
       ${terminal(413, y + 17, '−')}`;
   } else {
     const offset = method === 'radiant' ? 26 : 15;
-    source = `<path class="heat-wire" d="M356 ${y + offset}V414h127v-${414 - yTop}h20M244 ${y + offset}V428h250v-${428 - yBottom}h9"/>
-      ${supply(503, yBox, preclean ? 'Heater off' : 'Heater DC', '+ lead', '− lead', 'heat')}`;
+    source = `<path class="heat-wire" d="M356 ${y + offset}V416h174v-20M244 ${y + offset}V430h334v-34"/>
+      ${supply(503, yBox, preclean ? 'Heater off' : 'Heater DC', '+ lead', '− lead', 'heat', '', 'bottom')}`;
   }
   const gun = config.ibad
     ? `<path class="voltage-wire" d="M108 242h34l14 15"/><path class="ground-wire" d="M108 268h31"/>${earth(139, 268)}
        <g class="supply voltage"><rect x="9" y="218" width="99" height="67" rx="8"/><text class="supply-title" x="20" y="239">Ar⁺ gun</text><text x="20" y="260">+ source</text><text x="20" y="277">0 V grid</text></g>`
     : '';
   return `${biased ? bias : groundedSubstrate}${lid}${shell}${source}${gun}`;
+}
+
+function gasInlet(gasLabel) {
+  return `<g class="gas-inlet">
+    <path d="M17 211h118" stroke="#1b2b40" stroke-width="10" stroke-linecap="round"/>
+    <path d="M17 211h118" stroke="#8ba9c0" stroke-width="5" stroke-linecap="round"/>
+    <rect x="98" y="200" width="13" height="22" rx="2" fill="#546d86" stroke="#a4bfd4"/>
+    <rect x="108" y="203" width="15" height="16" rx="2" fill="#557089" stroke="#abc2d7"/>
+    <path d="M130 205h12l6 3v6l-6 3h-12Z" fill="#68859d" stroke="#a6c2d8"/>
+    <path d="M43 203l19 8-19 8Zm38 0-19 8 19 8Z" fill="#2b5670" stroke="#b2c9db"/>
+    <path d="M62 205v-12m-7 0h14" fill="none" stroke="#b2c9db" stroke-width="2" stroke-linecap="round"/>
+    <text class="chamber-label minor" x="14" y="184">${gasLabel}</text>
+  </g>`;
+}
+
+function chamberSensors(hasPlasma) {
+  return `<g class="chamber-instruments">
+    <path d="M104 108h16m-11-8v16m5-16v16" stroke="#91b4ca" stroke-width="3" fill="none"/>
+    <rect x="10" y="76" width="94" height="55" rx="6" fill="#22364d" stroke="#94abc0"/>
+    <text class="gauge-label" x="57" y="88" text-anchor="middle" id="chamber-gauge-type">Vacuum gauge</text>
+    <rect x="16" y="94" width="82" height="28" rx="3" fill="#142b2e" stroke="#557575"/>
+    <text class="gauge-digits" x="57" y="108" text-anchor="middle" id="chamber-pressure"></text>
+    <text class="gauge-unit" x="57" y="118" text-anchor="middle">mbar</text>
+    <g class="chamber-sensor">
+      <path d="M439 106v46m-12 0h24" stroke="#91b4ca" stroke-width="2" fill="none"/>
+      <rect x="428" y="152" width="22" height="8" rx="2" fill="#c6a674" stroke="#f1d398"/>
+      <text x="439" y="177" text-anchor="middle">QCM</text>
+      <circle cx="251" cy="118" r="3.6" fill="#edb472"/>
+      <path d="M251 115v-11h-15" stroke="#edb472" fill="none"/>
+      <text x="234" y="108" text-anchor="end">TC</text>
+      ${hasPlasma ? '<path d="M473 181h18v19h-18Z" fill="#535884" stroke="#bdafe4"/><text x="467" y="196" text-anchor="end">OES</text>' : ''}
+    </g>
+  </g>`;
 }
 
 function magnetronField(y) {
@@ -140,7 +174,6 @@ export function chamberMarkup(config, method, settings, material, film) {
     </defs>
     <rect width="620" height="465" fill="#14253d"/>
     <rect width="620" height="465" fill="url(#grid)"/>
-    <text class="chamber-label" x="16" y="30" id="chamber-pressure"></text>
     <text class="chamber-label" x="603" y="30" text-anchor="end" id="chamber-power">Standby</text>
     <path d="M65 269h57v22H65M58 266v28h7v-28Z" fill="#304e70" stroke="#7998be" stroke-width="2"/>
     <text class="chamber-label minor" x="16" y="311">To pump</text>
@@ -158,7 +191,8 @@ export function chamberMarkup(config, method, settings, material, film) {
     ${config.classic ? '<path id="surface-residue" d="M203 137h194" stroke="#f4b280" stroke-width="3.5" stroke-dasharray="2 3" stroke-linecap="round"/>' : ''}
     <rect id="in-chamber-film" x="202" y="135" width="196" height="0" rx="2" fill="${film.colour}"/>
     <text class="chamber-label" x="320" y="104">Substrate</text>
-    ${gas ? `<path d="M61 207h63" stroke="#ab92d4" stroke-width="2" stroke-dasharray="4 4"/><text class="chamber-label gas-label" x="12" y="200">${gasLabel}</text>` : ''}
+    ${chamberSensors(gas)}
+    ${gas ? gasInlet(gasLabel) : ''}
     ${sourceMarkup(config, method, y, material.colour)}
     ${config.ibad ? '<path d="m144 265 37-21 13 24-37 21Z" fill="#6c829f" stroke="#c2ace3"/><path d="m179 245 14 24" stroke="#c2ace3" stroke-width="2"/>' : ''}
     <foreignObject x="0" y="0" width="620" height="465" clip-path="url(#chamber-interior)" pointer-events="none">
