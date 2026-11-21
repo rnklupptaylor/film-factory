@@ -337,6 +337,13 @@ el('run').addEventListener('click', switchRun);
 el('reset').addEventListener('click', () => { resetRun(); compute(); });
 el('guide').addEventListener('click', openGuide);
 el('compact-guide').addEventListener('click', openGuide);
+el('enlarge-chamber').addEventListener('click', (event) => {
+  const button = event.currentTarget;
+  const expanded = button.getAttribute('aria-pressed') !== 'true';
+  el('workspace').dataset.enlarged = String(expanded);
+  button.setAttribute('aria-pressed', String(expanded));
+  button.textContent = expanded ? 'Settings' : 'Expand';
+});
 el('theory').addEventListener('click', () => { renderTheory(); el('dialog').showModal(); });
 el('close').addEventListener('click', () => el('dialog').close());
 el('previous').addEventListener('click', () => { theoryPage--; renderTheory(); });

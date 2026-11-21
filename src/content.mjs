@@ -64,9 +64,9 @@ export function controlGroups(config, material) {
     return controls;
   }
   const bias = config.ibad ? ['bias', 'Ion beam energy', 'Eᵢ', 20, 600, 5, 'eV']
-    : ['bias', 'Negative substrate bias', '−Vₛ', 0, config.classic ? 3500 : 300, config.classic ? 25 : 5, 'V'];
-  const ionCurrent = ['ionCurrent', 'Substrate ion current density', 'jᵢ', 0, config.arc ? 2 : 1, .01, 'mA/cm²'];
-  return [[bias, ionCurrent], [['arrival', 'Incoming rate at reference gap', 'R₀', .1, 12, .1, 'nm/s'], pressure], [distance, substrate]];
+    : ['bias', 'Substrate bias', 'Vₛ', 0, config.classic ? 3500 : 300, config.classic ? 25 : 5, 'V'];
+  const ionCurrent = ['ionCurrent', 'Ion current density', 'jᵢ', 0, config.arc ? 2 : 1, .01, 'mA/cm²'];
+  return [[bias, ionCurrent], [['arrival', 'Incoming rate at 14 cm', 'R₀', .1, 12, .1, 'nm/s'], pressure], [distance, substrate]];
 }
 
 export const RUN_LENGTH = 60;

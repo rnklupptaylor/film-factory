@@ -39,6 +39,7 @@
 html { min-width: 280px; }
 body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100dvh;
   margin: 0;
@@ -161,6 +162,8 @@ select {
 .legend i { width: .56rem; height: .56rem; display: inline-grid; place-content: center; border-radius: 50%; background: var(--plot); }
 .legend .ion { border: 1px solid #aa72d6; color: #aa72d6; background: transparent; font-size: .73rem; font-style: normal; font-weight: 750; }
 .legend .electron { background: #d78738; }
+.chamber-footer { display: flex; align-items: center; justify-content: center; gap: .35rem; min-width: 0; }
+#enlarge-chamber { display: none; }
 .plot-caption { color: var(--muted); font-size: .82rem; min-height: 2.25em; }
 .chart text { fill: var(--muted); font: 13px system-ui, sans-serif; }
 .chart text.major { fill: var(--ink); font-weight: 690; }
@@ -202,6 +205,8 @@ dialog::backdrop { background: #0c1935a0; }
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: .33rem; }
   .workspace[data-mobile="plots"] { grid-template-rows: minmax(0, 1fr); }
   .workspace[data-mobile="plots"] .controls { display: none; }
+  .workspace[data-mobile="chamber"][data-enlarged="true"] { grid-template-rows: minmax(0, 1fr); }
+  .workspace[data-mobile="chamber"][data-enlarged="true"] .controls { display: none; }
   .chamber { grid-row: 1; }
   .panel { padding: .39rem .48rem; gap: .3rem; border-radius: 9px; }
   .chamber .panel-header { display: none; }
@@ -216,6 +221,8 @@ dialog::backdrop { background: #0c1935a0; }
   .slider input { height: 22px; margin: 0; }
   .hardware-note { display: none; }
   .legend { gap: .55rem; font-size: .73rem; }
+  #enlarge-chamber { display: block; min-height: 23px; padding: .08rem .29rem; font-size: .7rem; }
+  .chamber-footer { justify-content: space-between; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric { padding: .15rem .4rem; overflow: hidden; }
   .metric:nth-child(3) { border-left: 0; }
