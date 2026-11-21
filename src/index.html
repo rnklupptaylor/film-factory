@@ -90,7 +90,14 @@
       </section>
       <section class="panel chamber" aria-labelledby="chamber-title">
         <div class="panel-header"><h2 id="chamber-title">Vacuum chamber</h2><span class="section-meta">Schematic</span></div>
-        <div id="chamber-art" class="chamber-art"></div>
+        <div class="chamber-stage">
+          <div class="chamber-tools">
+            <button type="button" id="chamber-labels" aria-controls="chamber-art" aria-pressed="true">Labels</button>
+            <button type="button" id="chamber-grains" aria-controls="film-grain-inset" aria-pressed="false">Grains</button>
+            <span id="chamber-power">Standby</span>
+          </div>
+          <div id="chamber-art" class="chamber-art"></div>
+        </div>
         <div class="chamber-footer">
           <div class="legend" id="legend"></div>
           <button id="enlarge-chamber" class="button" type="button" aria-pressed="false">Expand</button>
@@ -111,6 +118,10 @@
             <nav class="seg" aria-label="Morphology time">
               <button type="button" data-model="preview" aria-pressed="true">Preview</button>
               <button type="button" data-model="actual" aria-pressed="false">This run</button>
+            </nav>
+            <nav class="seg" aria-label="Morphology appearance">
+              <button type="button" data-rendering="sem" aria-pressed="true">SEM</button>
+              <button type="button" data-rendering="grains" aria-pressed="false">Grains</button>
             </nav>
             <nav class="seg" aria-label="Morphology camera">
               <button type="button" data-camera="tilt" aria-pressed="true">Tilt</button>

@@ -1,15 +1,17 @@
-import { makeMorphology } from './microstructure.mjs';
+import { grainColour, makeMorphology, SURFACE_VERTEX_STRIDE } from './microstructure.mjs';
 
 const SEM_VERTEX = `
 attribute vec3 position;
 attribute vec3 normal;
 attribute vec2 appearance;
+attribute vec3 grainTint;
 uniform vec2 yaw;
 uniform vec2 pitch;
 uniform vec2 scale;
 uniform vec3 centre;
 varying vec3 surfaceNormal;
 varying vec2 surface;
+varying vec3 tint;
 vec3 rotate(vec3 p) {
   vec3 r = vec3(yaw.x*p.x-yaw.y*p.y, yaw.y*p.x+yaw.x*p.y, p.z);
   return vec3(r.x, pitch.x*r.y + pitch.y*r.z, pitch.x*r.z-pitch.y*r.y);
@@ -19,20 +21,26 @@ void main() {
   gl_Position = vec4(p.xy * scale, -p.z * min(scale.x,scale.y)*0.6, 1.);
   surfaceNormal = rotate(normal);
   surface = appearance;
+  tint = grainTint;
 }`;
 
 const SEM_FRAGMENT = `
 precision mediump float;
 varying vec3 surfaceNormal;
 varying vec2 surface;
+varying vec3 tint;
+uniform float showGrains;
 void main() {
   vec3 n = normalize(surfaceNormal + vec3(0.,0.,0.00001));
   float facing = abs(n.z);
   float detector = max(0., dot(n, normalize(vec3(-0.65,0.66,0.40))));
   float edge = 0.21 * pow(1.-facing, 1.65);
   float noise = fract(sin(dot(mod(gl_FragCoord.xy,211.),vec2(12.9898,78.233)))*4375.5453)-0.5;
-  float shade = (0.25 + 0.53*detector + edge + 0.26*facing) * surface.x * (0.41 + 0.64*surface.y);
-  gl_FragColor = vec4(vec3(clamp(shade + 0.043*noise, 0.055, 0.95)),1.);
+  float light = 0.25 + 0.53*detector + edge + 0.26*facing;
+  float shade = light * surface.x * (0.41 + 0.64*surface.y);
+  vec3 sem = vec3(clamp(shade + 0.043*noise, 0.055, 0.95));
+  vec3 grains = tint * (0.56 + 0.54*light);
+  gl_FragColor = vec4(mix(sem, grains, showGrains),1.);
 }`;
 
 function microscopeGL(canvas) {
@@ -52,20 +60,56 @@ function microscopeGL(canvas) {
   gl.useProgram(program);
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  for (const [name, length, offset] of [['position',3,0],['normal',3,12],['appearance',2,24]]) {
+  for (const [name, length, offset] of [['position',3,0],['normal',3,12],['appearance',2,24],['grainTint',3,32]]) {
     const id = gl.getAttribLocation(program, name);
     gl.enableVertexAttribArray(id);
-    gl.vertexAttribPointer(id, length, gl.FLOAT, false, 32, offset);
+    gl.vertexAttribPointer(id, length, gl.FLOAT, false, SURFACE_VERTEX_STRIDE * 4, offset);
   }
-  const uniform = Object.fromEntries(['yaw','pitch','scale','centre'].map(name => [name, gl.getUniformLocation(program, name)]));
+  const uniform = Object.fromEntries(['yaw','pitch','scale','centre','showGrains'].map(name => [name, gl.getUniformLocation(program, name)]));
   gl.enable(gl.DEPTH_TEST);
   return { gl, uniform };
 }
 
+export function paintGrainMap(ctx, model, width, height, fill = .88) {
+  ctx.fillStyle = '#14191f';
+  ctx.fillRect(0, 0, width, height);
+  if (!model) return;
+  const { size, grainMap } = model;
+  const step = Math.min(width, height) * fill / size;
+  const left = (width - step * size) / 2;
+  const top = (height - step * size) / 2;
+  const inks = new Map();
+  ctx.beginPath();
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const index = x + y * size;
+      const tag = grainMap[index];
+      if (!inks.has(tag)) inks.set(tag, `rgb(${grainColour(tag).map((value) => Math.round(value * 255)).join(',')})`);
+      ctx.fillStyle = inks.get(tag);
+      const px = left + x * step;
+      const py = top + y * step;
+      ctx.fillRect(px, py, Math.ceil(step), Math.ceil(step));
+      if (x + 1 < size && tag !== grainMap[index + 1]) {
+        ctx.moveTo(px + step, py);
+        ctx.lineTo(px + step, py + step);
+      }
+      if (y + 1 < size && tag !== grainMap[index + size]) {
+        ctx.moveTo(px, py + step);
+        ctx.lineTo(px + step, py + step);
+      }
+    }
+  }
+  ctx.strokeStyle = '#151b24b8';
+  ctx.lineWidth = Math.max(.45, step * .14);
+  ctx.stroke();
+}
+
 export class FilmMicroscope {
-  constructor(canvas, status, workerCode) {
+  constructor(canvas, status, workerCode, onModel) {
     this.canvas = canvas;
     this.status = status;
+    this.onModel = onModel;
+    this.style = 'sem';
     this.rotation = [-.61, .83];
     this.key = '';
     this.busy = false;
@@ -118,10 +162,18 @@ export class FilmMicroscope {
     this.draw();
   }
 
+  setStyle(style) {
+    if (this.style === style) return;
+    this.style = style;
+    if (!this.model) return;
+    this.updateReadout();
+    this.draw();
+  }
+
   request(key, segments, reference) {
     if (this.key === key) return;
     this.key = key;
-    const request = { segments, reference };
+    const request = { key, segments, reference };
     if (this.busy) this.next = request;
     else this.dispatch(request);
   }
@@ -135,23 +187,36 @@ export class FilmMicroscope {
 
   display(model) {
     this.model = model;
+    this.modelKey = this.active.key;
     this.busy = false;
     if (this.gpu) {
       const { gl } = this.gpu;
       gl.bufferData(gl.ARRAY_BUFFER, model.mesh, gl.DYNAMIC_DRAW);
     }
-    const roughness = model.roughnessNm > 0 && model.roughnessNm < .1 ? '&lt; 0.1' : `≈ ${model.roughnessNm.toFixed(1)}`;
-    this.status.innerHTML = model.count
-      ? `${Math.round(model.coverage * 100)}% area covered · ${Math.round(model.voidFraction * 100)}% voids in envelope · <span class="roughness" title="Modelled areal RMS height relative to the mean plane">S<sub>q</sub> ${roughness} nm</span>`
-      : 'Bare substrate';
-    const rendering = this.gpu ? 'SEM-style 3D view' : '2D height fallback';
-    this.canvas.setAttribute('aria-label', `${rendering}. ${this.status.textContent}.`);
+    this.updateReadout();
     this.draw();
+    this.onModel?.();
     if (this.next) {
       const request = this.next;
       this.next = undefined;
       this.dispatch(request);
     }
+  }
+
+  updateReadout() {
+    const model = this.model;
+    const grains = this.style === 'grains';
+    const shape = grains ? (model.grainCount
+      ? `${model.grainCount} exposed grains · median diameter ${model.medianDiameter.toFixed(1)} cells`
+      : 'Amorphous film')
+      : `${Math.round(model.coverage * 100)}% area covered · ${Math.round(model.voidFraction * 100)}% voids in envelope`;
+    const roughness = model.roughnessNm > 0 && model.roughnessNm < .1 ? '&lt; 0.1' : `≈ ${model.roughnessNm.toFixed(1)}`;
+    this.status.innerHTML = model.count
+      ? `${shape} · <span class="roughness" title="Modelled areal RMS height relative to the mean plane">S<sub>q</sub> ${roughness} nm</span>`
+      : 'Bare substrate';
+    const rendering = grains ? (this.gpu ? '3D grain view' : 'Top-view grain map')
+      : (this.gpu ? 'SEM-style 3D view' : '2D height fallback');
+    this.canvas.setAttribute('aria-label', `${rendering}. ${this.status.textContent}.`);
   }
 
   draw() {
@@ -175,11 +240,16 @@ export class FilmMicroscope {
     gl.uniform2f(uniform.pitch, Math.cos(pitch), Math.sin(pitch));
     gl.uniform2f(uniform.scale, unit/w, unit/h);
     gl.uniform3f(uniform.centre, (size - 1)/2, (size - 1)/2, (highest - 3)/2);
-    gl.drawArrays(gl.TRIANGLES, 0, mesh.length / 8);
+    gl.uniform1f(uniform.showGrains, Number(this.style === 'grains'));
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.length / SURFACE_VERTEX_STRIDE);
   }
 
   drawTop(w,h) {
     if (!this.ctx) return;
+    if (this.style === 'grains') {
+      paintGrainMap(this.ctx, this.model, w, h);
+      return;
+    }
     const { size, tops, highest } = this.model;
     const step = Math.min(w,h) * .84 / size;
     const left = (w - step * size) / 2, top = (h - step * size) / 2;

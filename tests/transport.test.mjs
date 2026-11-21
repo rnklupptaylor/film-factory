@@ -141,3 +141,15 @@ test('the holder has its own heater and a distinct rendering for each substrate'
   }
   assert.equal(substrates.size, Object.keys(SUBSTRATES).length);
 });
+
+test('chamber object names have leaders and the film grain inset starts hidden', () => {
+  const { config, settings, material, sample } = scene('diode');
+  const diagram = chamberMarkup(config, 'diode', settings, material, sample.film);
+  const groups = [...diagram.matchAll(/<g class="chamber-annotation">([\s\S]*?)<\/g>/g)];
+  for (const name of ['Substrate', 'Substrate holder', 'Target', 'To pump']) {
+    const group = groups.find(([, content]) => content.includes(`>${name}</text>`));
+    assert.ok(group && /class="annotation-arrow"/.test(group[1]), name);
+  }
+  assert.match(diagram, /id="film-grain-inset" visibility="hidden"/);
+  assert.match(diagram, /id="chamber-grain-map"/);
+});

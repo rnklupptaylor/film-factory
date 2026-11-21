@@ -5,7 +5,7 @@ import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
 import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gasReadings, processGas, chamberPressure, pressureGauge } from './instruments.mjs';
 import { growthConditions } from './microstructure.mjs';
-import { FilmMicroscope } from './microscope.mjs';
+import { FilmMicroscope, paintGrainMap } from './microscope.mjs';
 
 const el = (id) => document.getElementById(id);
 const option = (value, label) => `<option value="${value}">${label}</option>`;
@@ -42,7 +42,7 @@ let frame = 0;
 let manualTheme = false;
 let chamber;
 let microscope;
-let modelMode = 'auto', sensorMode = 'qcm', tooling = 100;
+let modelMode = 'auto', modelStyle = 'sem', sensorMode = 'qcm', tooling = 100;
 let growthLog = [], growthDuration = 0, growthReference = 0, modelRun = 0;
 let qcmMass = 0, qcmThickness = 0, qcmHistory = [[0,0]];
 let growthInput = growthConditions(config, settings, sample);
@@ -176,6 +176,7 @@ function setupChamber() {
     plasma: el('plasma-glow'), beam: el('electron-guide'),
     coil: el('holder-coil'), valve: el('gas-valve-state'), lamp: el('gas-valve-lamp'),
     species: el('gas-species'), gunFeed: el('gun-gas-path'),
+    grainInset: el('film-grain-inset'), grainCanvas: el('chamber-grain-map'), grainMeta: el('grain-inset-meta'),
   };
   const hasIons = family !== 'evaporation';
   const ionText = config.arc ? 'Ti ions' : 'Ar⁺';
@@ -184,10 +185,11 @@ function setupChamber() {
     + (variant === 'ebeam' ? '<span><i class="electron"></i> Electrons</span>' : '')
     + (family === 'plating' ? `<span><i class="removed"></i> ${isPreclean() ? 'Material removed' : 'Resputtered atoms'}</span>` : '')
     + (family === 'evaporation' ? '' : '<span id="gas-legend"></span>');
+  renderGrainInset();
 }
 
 function renderChamber() {
-  chamber.svg.setAttribute('viewBox', compactChamber.matches ? '5 39 609 422' : '0 0 620 465');
+  chamber.svg.setAttribute('viewBox', compactChamber.matches ? '5 39 609 404' : '0 30 620 422');
   chamber.feed = processGas(config, settings);
   if (chamber.feed) {
     chamber.species.textContent = chamber.feed.label;
@@ -199,6 +201,28 @@ function renderChamber() {
   if (chamber.bias) chamber.bias.textContent = `${settings.bias ? '−' : ''}${settings.bias} V`;
   drawChamberSurface();
   drawChamberMotion();
+}
+
+function renderGrainInset() {
+  const enabled = modelStyle === 'grains';
+  chamber.grainInset.setAttribute('visibility', enabled ? 'visible' : 'hidden');
+  if (!enabled) return;
+  const canvas = chamber.grainCanvas;
+  const key = microscope?.key ?? '';
+  const displayed = microscope?.modelKey ?? '';
+  const current = displayed === key
+    || (key.startsWith('actual|') && key.split('|', 2).join('|') === displayed.split('|', 2).join('|'));
+  const model = current ? microscope?.model : null;
+  if (model === chamber.insetModel) return;
+  chamber.insetModel = model;
+  const ctx = canvas.getContext('2d');
+  if (ctx) paintGrainMap(ctx, model, canvas.width, canvas.height, .98);
+  const time = displayed.startsWith('preview|') ? '60 s forecast' : 'This run';
+  const label = !model ? 'Updating…' : !model.count ? 'Bare substrate'
+    : !model.grainCount ? 'Amorphous' : time;
+  chamber.grainMeta.textContent = label;
+  canvas.setAttribute('aria-label', model?.grainCount
+    ? `Top view, ${time}, ${model.grainCount} exposed grains.` : `Top view. ${label}.`);
 }
 
 function drawChamberSurface() {
@@ -307,7 +331,8 @@ function renderResiduePlot() {
 
 function renderMorphology() {
   if (!microscope) {
-    microscope = new FilmMicroscope(el('micrograph'), el('model-readout'), morphologyWorkerCode);
+    microscope = new FilmMicroscope(el('micrograph'), el('model-readout'), morphologyWorkerCode, renderGrainInset);
+    microscope.setStyle(modelStyle);
     el('model-view').querySelectorAll('[data-camera]').forEach((button) => { button.disabled = !microscope.gpu; });
   }
   const mode = modelMode === 'auto' ? (growthDuration ? 'actual' : 'preview') : modelMode;
@@ -318,11 +343,25 @@ function renderMorphology() {
   const segments = preview ? [{ ...growthInput, duration: RUN_LENGTH }] : growthLog;
   const reference = preview ? growthInput.gross * RUN_LENGTH : growthReference;
   microscope.request(key, segments.map(part => ({...part})), reference);
+  if (modelStyle === 'grains') renderGrainInset();
+  if (plot !== 'morphology') return;
   const theta = growthInput.theta == null ? '' : ` · Tₛ/Tₘ ${number(growthInput.theta)}`;
   el('plot-meta').textContent = `${preview ? '60 s forecast' : 'Accumulated film'}${theta}`;
+  const details = modelStyle === 'grains'
+    ? 'Colours mark individual grains. Diameter uses exposed area in grid cells.'
+    : `${microscope.gpu ? 'Drag or use arrow keys to rotate.' : 'Surface height map.'} RMS roughness comes from modelled heights.`;
   el('plot-caption').textContent = substrateStatus(settings).hot
     ? 'Above the substrate thermal reference. The model still assumes an intact substrate.'
-    : `${microscope.gpu ? 'Drag or use arrow keys to rotate.' : 'Surface height map.'} RMS roughness comes from modelled heights.`;
+    : details;
+}
+
+function selectModelStyle(style) {
+  modelStyle = style;
+  pressed(el('model-view'), 'rendering', style);
+  el('chamber-grains').setAttribute('aria-pressed', String(style === 'grains'));
+  microscope?.setStyle(style);
+  renderPlot();
+  if (style === 'sem') renderGrainInset();
 }
 
 function instrumentCards(readings) {
@@ -380,7 +419,8 @@ function renderPlot() {
   el('model-view').hidden = plot !== 'morphology';
   el('sensor-view').hidden = plot !== 'diagnostics';
   el('graphic').hidden = plot === 'morphology' || plot === 'diagnostics';
-  if (plot === 'morphology') { renderMorphology(); return; }
+  if (plot === 'morphology' || modelStyle === 'grains') renderMorphology();
+  if (plot === 'morphology') return;
   if (plot === 'diagnostics') { renderInstruments(); return; }
   let view;
   if (plot === 'growth' && isPreclean()) {
@@ -496,6 +536,7 @@ function trackFilm(elapsed, now) {
     drawChamberSurface();
     renderMetrics();
     if (plot !== 'source' && (plot !== 'diagnostics' || sensorMode !== 'vacuum')) renderPlot();
+    else if (modelStyle === 'grains') renderMorphology();
   }
 }
 
@@ -621,11 +662,19 @@ el('model-view').addEventListener('click', (event) => {
     modelMode = event.target.dataset.model;
     renderMorphology();
   }
+  if (event.target.dataset.rendering) selectModelStyle(event.target.dataset.rendering);
   if (event.target.dataset.camera) {
     microscope.setView(event.target.dataset.camera);
     pressed(el('model-view'), 'camera', event.target.dataset.camera);
   }
 });
+el('chamber-labels').addEventListener('click', (event) => {
+  const button = event.currentTarget;
+  const show = button.getAttribute('aria-pressed') !== 'true';
+  button.setAttribute('aria-pressed', String(show));
+  el('chamber-art').classList.toggle('hide-labels', !show);
+});
+el('chamber-grains').addEventListener('click', () => selectModelStyle(modelStyle === 'grains' ? 'sem' : 'grains'));
 el('sensor-view').addEventListener('click', (event) => {
   if (!event.target.dataset.sensor) return;
   sensorMode = event.target.dataset.sensor;

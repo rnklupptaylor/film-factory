@@ -17,6 +17,14 @@ function earth(x, y) {
   return `<path class="ground-wire" d="M${x} ${y}v6m-8 0h16m-12 4h8m-6 4h4"/>`;
 }
 
+function annotation(label, x, y, leader, { anchor = 'start', detail = '' } = {}) {
+  return `<g class="chamber-annotation">
+    <path class="annotation-arrow" d="${leader}"/>
+    <text class="chamber-label minor" x="${x}" y="${y}" text-anchor="${anchor}">${label}</text>
+    ${detail ? `<text class="chamber-label minor" x="${x}" y="${y + 13}" text-anchor="${anchor}">${detail}</text>` : ''}
+  </g>`;
+}
+
 function supply(x, y, title, first, second, type, id = '', wiring = 'ground') {
   const ground = wiring === 'ground';
   const contacts = ground ? `<circle cx="${x}" cy="${y + 39}" r="3.3"/>
@@ -53,10 +61,9 @@ function circuitMarkup(config, method, y, preclean) {
     const outgoing = method === 'rf'
       ? `<path class="voltage-wire" d="M300 ${y + 20}V416h109m13 0h75v-${416 - yTop}h6m-94 41v20m13-20v20"/>`
       : `<path class="voltage-wire" d="M300 ${y + 20}V416h197v-${416 - yTop}h6"/>`;
-    const targetLabel = method === 'rf' ? '− self-bias' : config.arc ? '− Ti cathode' : '− target';
     source = `${outgoing}
       ${supply(503, yBox, title, method === 'rf' ? '~ 13.56 MHz' : config.diode ? '−2.5 kV' : '− cathode', method === 'rf' ? '0 V return' : '+ return', 'voltage')}
-      <text class="electrode-label" x="386" y="${y + 9}">${targetLabel}</text>`;
+      ${terminal(398, y + 5, '−')}`;
   } else if (method === 'ebeam') {
     source = `<path class="voltage-wire" d="M400 ${y + 25}V416h97v-${416 - yTop}h6"/>
       <path class="ground-wire" d="M300 ${y + 15}v32"/>${earth(300, y + 47)}
@@ -86,7 +93,10 @@ function gasInlet(gas) {
     <path d="M43 203l19 8-19 8Zm38 0-19 8 19 8Z" fill="#2b5670" stroke="#b2c9db"/>
     <path d="M62 205v-12m-7 0h14" fill="none" stroke="#b2c9db" stroke-width="2" stroke-linecap="round"/>
     <circle id="gas-valve-lamp" cx="18" cy="181" r="3" fill="#8a9eb4"/>
-    <text class="chamber-label minor" x="26" y="185" id="gas-species">${gas.label}</text>
+    <g class="chamber-annotation">
+      <path class="annotation-arrow" d="M70 188l9 15"/>
+      <text class="chamber-label minor" x="26" y="185" id="gas-species">${gas.label}</text>
+    </g>
     <text class="gas-valve-state" x="14" y="${gas.gun ? 166 : 232}" id="gas-valve-state">Closed</text>
   </g>`;
 }
@@ -118,7 +128,6 @@ function holderMarkup(wafer) {
     <path d="M194 124h17v5h-8v6h-6v-8h-3Zm212 0h-17v5h8v6h6v-8h3Z" fill="#8196ae" stroke="#bccde2"/>
     <rect x="202" y="${y}" width="196" height="${wafer.height}" rx="1.6" fill="url(#substrate-material)" stroke="${wafer.edge}"/>
     <path d="${wafer.detail}" fill="none" stroke="${wafer.edge}" opacity=".57"/>
-    <text class="chamber-label" x="317" y="103">${wafer.label}</text>
   </g>`;
 }
 
@@ -133,11 +142,8 @@ function chamberSensors(hasPlasma) {
     <g class="chamber-sensor">
       <path d="M439 106v46m-12 0h24" stroke="#91b4ca" stroke-width="2" fill="none"/>
       <rect x="428" y="152" width="22" height="8" rx="2" fill="#c6a674" stroke="#f1d398"/>
-      <text x="439" y="177" text-anchor="middle">QCM</text>
       <circle cx="282" cy="111" r="3.1" fill="#edb472"/>
-      <path d="M282 109V99h-15" stroke="#edb472" fill="none"/>
-      <text x="264" y="103" text-anchor="end">TC</text>
-      ${hasPlasma ? '<path d="M473 181h18v19h-18Z" fill="#535884" stroke="#bdafe4"/><text x="467" y="196" text-anchor="end">OES</text>' : ''}
+      ${hasPlasma ? '<path d="M473 181h18v19h-18Z" fill="#535884" stroke="#bdafe4"/>' : ''}
     </g>
   </g>`;
 }
@@ -156,8 +162,8 @@ function magnetronField(y) {
     </g>
     ${magnets}
     <path d="M245 ${y + 35}h110" stroke="#6986ab" stroke-width="3"/>
-    <text class="field-label" x="300" y="${y - 64}" text-anchor="middle">Magnetic field B</text>
-    <text class="chamber-label minor" x="221" y="${y + 28}" text-anchor="end">Magnetron</text>
+    ${annotation('Magnetic field B', 300, y - 69, `M300 ${y - 65}l22 16`, { anchor: 'middle' })}
+    ${annotation('Magnetron', 215, y + 34, `M220 ${y + 31}l19-7`, { anchor: 'end' })}
   </g>`;
 }
 
@@ -172,7 +178,7 @@ function sourceMarkup(config, method, y, colour) {
       <rect x="224" y="${y}" width="152" height="11" rx="2" fill="${colour}" stroke="#c1cfe0"/>
       <path class="ground-wire" d="M450 ${y - 45}h30"/>
       <path d="M450 ${y - 66}v45" stroke="#8ca9ce" stroke-width="5"/>
-      <text class="chamber-label minor" x="445" y="${y - 72}" text-anchor="end">Anode 0 V</text>`;
+      ${annotation('Anode 0 V', 446, y - 73, `M448 ${y - 70}l2 9`, { anchor: 'end' })}`;
   }
   if (method === 'filament') {
     const coil = `M244 ${y + 15}v-10h12l10-9 12 13 13-13 13 13 13-13 13 13 13-9h13v15`;
@@ -195,6 +201,7 @@ export function chamberMarkup(config, method, settings, material, film) {
   const gas = processGas(config, settings);
   const hasPlasma = gas && !gas.gun;
   const wafer = WAFER_VIEW[settings.wafer] ?? WAFER_VIEW.silicon;
+  const pumpY = config.ibad ? 300 : 269;
   const plasmaY = config.classic ? 175 : config.diode ? y - 99 : y - 52;
   const preclean = config.classic && settings.preclean;
   const substrate = config.classic || config.arc ? 'Negatively biased substrate' : 'Substrate holder at ground';
@@ -211,12 +218,11 @@ export function chamberMarkup(config, method, settings, material, film) {
       <linearGradient id="steel" x2="0" y2="1"><stop stop-color="#a8bed6"/><stop offset="1" stop-color="#4f6b8c"/></linearGradient>
       <linearGradient id="substrate-material" x2="0" y2="1">${wafer.stops.map((colour, index) => `<stop offset="${[0,.62,1][index]}" stop-color="${colour}"/>`).join('')}</linearGradient>
       <clipPath id="chamber-interior"><rect x="119" y="81" width="360" height="316" rx="27"/></clipPath>
+      <marker id="annotation-arrowhead" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L7 4L1 7Z" fill="#b6cbe2"/></marker>
     </defs>
     <rect width="620" height="465" fill="#14253d"/>
     <rect width="620" height="465" fill="url(#grid)"/>
-    <text class="chamber-label" x="603" y="30" text-anchor="end" id="chamber-power">Standby</text>
-    <path d="M65 269h57v22H65M58 266v28h7v-28Z" fill="#304e70" stroke="#7998be" stroke-width="2"/>
-    <text class="chamber-label minor" x="16" y="311">To pump</text>
+    <path d="M65 ${pumpY}h57v22H65M58 ${pumpY - 3}v28h7v-28Z" fill="#304e70" stroke="#7998be" stroke-width="2"/>
     <rect x="106" y="68" width="386" height="342" rx="37" fill="#314b68" stroke="#94afd1" stroke-width="2"/>
     <rect x="119" y="81" width="360" height="316" rx="27" fill="#122137" stroke="#6b8aac" stroke-width="2"/>
     <g clip-path="url(#chamber-interior)">
@@ -238,6 +244,24 @@ export function chamberMarkup(config, method, settings, material, film) {
     </foreignObject>
     <path d="M461 146v${y - 154}m-5-${y - 154}h10m-10 ${y - 154}h10" stroke="#8ca9ce" stroke-width="1" fill="none"/>
     <text class="chamber-label minor" x="453" y="${(y + 146) / 2}" text-anchor="end">L</text>
-    <text class="chamber-label" x="300" y="452" text-anchor="middle">${config.hardware}</text>
+    ${annotation('To pump', 16, pumpY + 42, `M65 ${pumpY + 37}l12-15`)}
+    ${annotation('Substrate holder', 133, 156, 'M164 144l26-27')}
+    ${annotation('Substrate', 318, 92, 'M431 94v18l-33 20', { detail: wafer.label })}
+    ${annotation('TC', 266, 96, 'M270 96l11 12', { anchor: 'end' })}
+    ${annotation('QCM', 439, 184, 'M439 172v-11', { anchor: 'middle' })}
+    ${hasPlasma ? annotation('OES', 465, 204, 'M468 198l5-7', { anchor: 'end' }) : ''}
+    ${config.family === 'sputtering' || config.arc
+      ? annotation(config.arc ? 'Ti cathode' : 'Target', 150, y + 5, `M200 ${y + 1}l24 4`, { detail: method === 'rf' ? '− self-bias' : '' })
+      : annotation(method === 'ebeam' ? 'Hearth' : 'Source', 151, y + 7, `M205 ${y + 3}l${method === 'filament' ? 39 : 31} 2`)}
+    ${method === 'ebeam' ? annotation('E-gun', 427, y + 31, `M423 ${y + 28}h-11`) : ''}
+    ${config.ibad ? annotation('Ion gun', 130, 300, 'M159 289l11-12') : ''}
+    <g id="film-grain-inset" visibility="hidden">
+      <rect x="502" y="158" width="106" height="136" rx="7" fill="#1e334d" stroke="#89aaca"/>
+      <text class="grain-inset-text" x="555" y="175" text-anchor="middle">Film grains</text>
+      <foreignObject x="511" y="181" width="88" height="88" pointer-events="none">
+        <canvas xmlns="http://www.w3.org/1999/xhtml" id="chamber-grain-map" width="176" height="176" role="img" aria-label="Top view of the film grains"></canvas>
+      </foreignObject>
+      <text class="grain-inset-meta" x="555" y="284" text-anchor="middle" id="grain-inset-meta"></text>
+    </g>
   </svg>`;
 }

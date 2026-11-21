@@ -16,7 +16,7 @@ for (const name of includes) {
 const kernel = bundle(await read('src/microstructure.mjs'));
 const worker = `${kernel}\nself.onmessage = ({ data }) => {
   const model = makeMorphology(data);
-  self.postMessage(model, [model.mesh.buffer, model.tops.buffer]);
+  self.postMessage(model, [model.mesh.buffer, model.tops.buffer, model.grainMap.buffer]);
 };`;
 html = html.replace('%%MORPHOLOGY_WORKER%%', () => JSON.stringify(worker).replaceAll('<', '\\u003c'));
 const output = new URL('build/deploy/', root);

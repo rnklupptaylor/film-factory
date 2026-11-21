@@ -4,6 +4,35 @@ const bounded = (x, min, max) => Math.min(max, Math.max(min, x));
 const ADJACENT = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
 const CORNERS = [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]];
 const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+const SUBSTRATE_TAG = 65535;
+export const SURFACE_VERTEX_STRIDE = 11;
+
+export function grainColour(tag) {
+  if (!tag || tag === SUBSTRATE_TAG) return [.23, .25, .28];
+  if (tag === 1) return [.59, .63, .67];
+  const hue = 6 * ((tag * .61803398875) % 1);
+  const light = tag % 2 ? .91 : .78;
+  return [5, 3, 1].map((shift) => {
+    const channel = (shift + hue) % 6;
+    return light * (1 - .63 * Math.max(0, Math.min(channel, 4 - channel, 1)));
+  });
+}
+
+export function exposedGrains(voxels, tops) {
+  const areas = new Map();
+  const grainMap = Uint16Array.from(tops, (height, index) => {
+    if (!height) return 0;
+    const tag = voxels[index + (height - 1) * tops.length];
+    if (tag > 1) areas.set(tag, (areas.get(tag) ?? 0) + 1);
+    return tag;
+  });
+  const sorted = [...areas.values()].sort((a,b) => a - b);
+  const diameter = (area) => 2 * Math.sqrt(area / Math.PI);
+  const lower = sorted[Math.floor((sorted.length - 1) / 2)] ?? 0;
+  const upper = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  const medianDiameter = (diameter(lower) + diameter(upper)) / 2;
+  return { grainMap, grainCount: sorted.length, medianDiameter };
+}
 
 export function growthConditions(config, settings, sample) {
   const support = SUBSTRATES[settings.wafer] ?? SUBSTRATES.silicon;
@@ -210,7 +239,7 @@ export function surfaceMesh(model) {
   for (let z = 1; z < layers - 1; z++) {
     for (let y = 1; y <= size; y++) {
       for (let x = 1; x <= size; x++) {
-        const film = z < 3 ? 0xffff : voxels[x - 1 + (y - 1) * size + (z - 3) * size ** 2];
+        const film = z < 3 ? SUBSTRATE_TAG : voxels[x - 1 + (y - 1) * size + (z - 3) * size ** 2];
         tags[x + y*w + z*slice] = film;
       }
     }
@@ -238,7 +267,7 @@ export function surfaceMesh(model) {
           ay += CORNERS[a][1] + (CORNERS[b][1] - CORNERS[a][1]) * ratio;
           az += CORNERS[a][2] + (CORNERS[b][2] - CORNERS[a][2]) * ratio;
           const occupied = tags[i + steps[f[a] > 0 ? a : b]];
-          if (!tag || tag === 0xffff) tag = occupied;
+          if (!tag || tag === SUBSTRATE_TAG) tag = occupied;
           edges++;
         }
         for (let c = 0; c < 8; c++) {
@@ -247,13 +276,15 @@ export function surfaceMesh(model) {
           gz += (CORNERS[c][2] ? -1 : 1) * f[c];
         }
         const length = Math.hypot(gx,gy,gz) || 1;
-        const shade = tag === 0xffff ? .48 : .76 + .16 * ((tag * .61803398875) % 1);
+        const shade = tag === SUBSTRATE_TAG ? .48 : .76 + .16 * ((tag * .61803398875) % 1);
         indices[i] = vertex.length / 8;
         vertex.push(x + ax/edges - 1, y + ay/edges - 1, z + az/edges - 3, gx/length, gy/length, gz/length, shade, 1 - count / 17);
       }
     }
   }
   const triangles = [];
+  const faceColours = [];
+  const palette = new Map();
   for (let z = 0; z < layers - 1; z++) {
     for (let y = 0; y < w - 1; y++) {
       for (let x = 0; x < w - 1; x++) {
@@ -264,19 +295,25 @@ export function surfaceMesh(model) {
           if ((values[i] > 0) === (values[i + strides[axis]] > 0)) continue;
           const a = strides[(axis + 1) % 3], b = strides[(axis + 2) % 3];
           const face = [indices[i],indices[i - a],indices[i - a - b],indices[i - b]];
-          if (face.every(v => v >= 0)) triangles.push(face[0],face[1],face[2],face[0],face[2],face[3]);
+          if (face.some(v => v < 0)) continue;
+          triangles.push(face[0],face[1],face[2],face[0],face[2],face[3]);
+          const tag = values[i] > 0 ? tags[i] : tags[i + strides[axis]];
+          if (!palette.has(tag)) palette.set(tag, grainColour(tag));
+          faceColours.push(palette.get(tag));
         }
       }
     }
   }
-  const packed = new Float32Array(triangles.length * 8);
+  const packed = new Float32Array(triangles.length * SURFACE_VERTEX_STRIDE);
   triangles.forEach((v,i) => {
-    for (let j = 0; j < 8; j++) packed[i * 8 + j] = vertex[v * 8 + j];
+    const start = i * SURFACE_VERTEX_STRIDE;
+    for (let j = 0; j < 8; j++) packed[start + j] = vertex[v * 8 + j];
+    packed.set(faceColours[Math.floor(i / 6)], start + 8);
   });
   return packed;
 }
 
 export function makeMorphology({ segments, reference }) {
   const { voxels, tops, ...stats } = simulateMorphology(segments, reference);
-  return { ...stats, tops, mesh: surfaceMesh({ ...stats, voxels }) };
+  return { ...stats, tops, ...exposedGrains(voxels, tops), mesh: surfaceMesh({ ...stats, voxels }) };
 }

@@ -19,4 +19,6 @@ test('build emits the self-contained app with its teaching version', () => {
   new Function('self', worker)(scope);
   scope.onmessage({ data: { segments: [] } });
   assert.equal(result.coverage, 0);
+  assert.equal(result.grainMap.length, 1600);
+  assert.match(page, /id="chamber-labels"[^>]+aria-pressed="true"/);
 });
