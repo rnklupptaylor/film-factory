@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MATERIALS, POSITIONS, advanceFilm, meanFreePath, rates, sputterYield, vapourPressure } from '../src/physics.mjs';
+import { MATERIALS, POSITIONS, advanceFilm, meanFreePath, rates, residueAfter, sputterYield, vapourPressure } from '../src/physics.mjs';
 import { VARIANTS, controlGroups, newSettings } from '../src/content.mjs';
 
 const check = (id, patch = {}) => {
@@ -38,6 +38,20 @@ test('target current, pulse duty, and reactive poisoning affect yield and rate',
   assert.ok(check('rf').gross > 0);
 });
 
+test('industrial ITO recipes distinguish conductive oxide and reactive metal targets', () => {
+  const ceramic = check('itoCeramic', { oxygen: 0 });
+  assert.equal(ceramic.film, MATERIALS.ITO);
+  assert.ok(Math.abs(ceramic.net - 20 / 60) < 1e-12);
+  const metal = check('itoReactive', { oxygen: 0 });
+  const transition = check('itoReactive', { oxygen: 5 });
+  const oxide = check('itoReactive');
+  assert.equal(metal.film, MATERIALS.InSn);
+  assert.equal(transition.film, MATERIALS.InSnOx);
+  assert.equal(oxide.film, MATERIALS.ITO);
+  assert.ok(metal.net > transition.net && transition.net > oxide.net);
+  assert.equal(check('arc').film, MATERIALS.TiN);
+});
+
 test('ion bombardment can overcome growth and removes existing film without negative thickness', () => {
   const coating = check('classic', { ionCurrent: 0 });
   const etch = check('classic', { ionCurrent: 1, bias: 3000 });
@@ -51,12 +65,29 @@ test('ion bombardment can overcome growth and removes existing film without nega
   assert.equal(check('ibad', {bias: 200}).ionEnergy, 200);
 });
 
+test('classic pre-cleaning turns off deposition and clears exposed residue only with sufficient ion flux and energy', () => {
+  const clean = check('classic', { preclean: true });
+  assert.equal(clean.gross, 0);
+  assert.ok(clean.loss > 0);
+  assert.ok(clean.cleanRate > 0);
+  assert.equal(residueAfter(1, check('classic'), 30), 1);
+  assert.equal(residueAfter(1, check('classic', { preclean: true, ionCurrent: 0 }), 30), 1);
+  assert.equal(residueAfter(1, check('classic', { preclean: true, bias: 0 }), 30), 1);
+  assert.equal(residueAfter(1, clean, 30, clean.loss * 40), 1);
+  assert.ok(Math.abs(residueAfter(1, clean, 30, clean.loss * 10) - residueAfter(1, clean, 20)) < 1e-12);
+  assert.ok(residueAfter(1, clean, 30) < .20);
+  assert.deepEqual(advanceFilm(POSITIONS.map(() => 0), clean, 30), POSITIONS.map(() => 0));
+});
+
 test('every selectable preset and control limit produces finite nonnegative flux', () => {
   for (const [id, config] of Object.entries(VARIANTS)) {
     for (const symbol of config.materials) {
       const material = MATERIALS[symbol];
       const settings = newSettings(id, symbol);
-      for (const [key, , , min, max] of controlGroups(config, material).flat()) {
+      const groups = controlGroups(config, material);
+      assert.equal(groups.length, 2);
+      assert.deepEqual(groups[1].slice(0, 3).map(([key]) => key), ['pressure', 'distance', 'substrate']);
+      for (const [key, , , min, max] of groups.flat()) {
         assert.ok(settings[key] >= min && settings[key] <= max, `${id}/${symbol}/${key} preset is in bounds`);
         for (const value of [min, max]) {
           const result = rates(config, { ...settings, [key]: value }, material);

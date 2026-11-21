@@ -13,4 +13,23 @@ test('build emits the self-contained app with its teaching version', () => {
   assert.doesNotMatch(page, /%%[A-Z.]+%%|<script[^>]+src=|<link[^>]+stylesheet/i);
   const script = page.match(/<script>([\s\S]+)<\/script>/)[1];
   assert.doesNotThrow(() => new Function(script));
+  const worker = JSON.parse(script.match(/^\s*const morphologyWorkerCode = (.+);$/m)[1]);
+  let result;
+  const scope = { postMessage: (model) => { result = model; } };
+  new Function('self', worker)(scope);
+  scope.onmessage({ data: { segments: [] } });
+  assert.equal(result.coverage, 0);
+  assert.equal(result.grainMap.length, 1600);
+  assert.match(page, /id="chamber-labels"[^>]+aria-pressed="true"/);
+  scope.onmessage({ data: { segments: [], summaryOnly: true } });
+  assert.equal(result.roughnessNm, 0);
+  assert.equal(result.mesh, undefined);
+  assert.match(page, /id="film-lightbox"/);
+  assert.match(page, /data-background="light"/);
+  assert.deepEqual([...page.matchAll(/data-plot="(\w+)" aria-pressed/g)].map(([, view]) => view),
+    ['source', 'growth', 'profile', 'morphology', 'zones', 'diagnostics', 'lightbox']);
+  assert.match(page, /id="material"[\s\S]*?id="wafer"[\s\S]*?id="control-pages"/);
+  assert.match(page, /id="preview-time".*min="5" max="180" step="5" value="60"/);
+  assert.match(page, /id="growth-transport" hidden/);
+  assert.doesNotMatch(page, /id="chamber-grains"/);
 });
