@@ -84,7 +84,10 @@ test('every selectable preset and control limit produces finite nonnegative flux
     for (const symbol of config.materials) {
       const material = MATERIALS[symbol];
       const settings = newSettings(id, symbol);
-      for (const [key, , , min, max] of controlGroups(config, material).flat()) {
+      const groups = controlGroups(config, material);
+      assert.equal(groups.length, 2);
+      assert.deepEqual(groups[1].slice(0, 3).map(([key]) => key), ['pressure', 'distance', 'substrate']);
+      for (const [key, , , min, max] of groups.flat()) {
         assert.ok(settings[key] >= min && settings[key] <= max, `${id}/${symbol}/${key} preset is in bounds`);
         for (const value of [min, max]) {
           const result = rates(config, { ...settings, [key]: value }, material);

@@ -83,6 +83,7 @@
         <div class="selects">
           <label><span>Method</span><select id="variant" aria-label="Method"></select></label>
           <label><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>
+          <label class="wafer-control"><span>Substrate</span><select id="wafer" aria-describedby="substrate-limit"></select><span id="substrate-limit" class="wafer-limit"></span></label>
         </div>
         <nav class="seg control-nav" id="control-pages" aria-label="Setting groups"></nav>
         <div id="sliders" class="sliders"></div>
@@ -93,7 +94,6 @@
         <div class="chamber-stage">
           <div class="chamber-tools">
             <button type="button" id="chamber-labels" aria-controls="chamber-art" aria-pressed="true">Labels</button>
-            <button type="button" id="chamber-grains" aria-controls="film-grain-inset" aria-pressed="false">Grains</button>
             <span id="chamber-power">Standby</span>
           </div>
           <div id="chamber-art" class="chamber-art"></div>
@@ -106,21 +106,17 @@
       <section class="panel results" aria-labelledby="results-title">
         <div class="panel-header"><h2 id="results-title">Film &amp; diagnostics</h2><span id="plot-meta" class="section-meta"></span></div>
         <nav class="seg plot-nav" aria-label="Film and diagnostics views">
+          <button type="button" data-plot="source" aria-pressed="false">Source</button>
           <button type="button" data-plot="growth" aria-pressed="true">Growth</button>
           <button type="button" data-plot="profile" aria-pressed="false">Profile</button>
-          <button type="button" data-plot="source" aria-pressed="false">Source</button>
           <button type="button" data-plot="morphology" aria-pressed="false">Morphology</button>
-          <button type="button" data-plot="lightbox" aria-pressed="false">Lightbox</button>
           <button type="button" data-plot="zones" aria-pressed="false">Zone model</button>
           <button type="button" data-plot="diagnostics" aria-pressed="false">Sensors</button>
+          <button type="button" data-plot="lightbox" aria-pressed="false">Lightbox</button>
         </nav>
         <div id="graphic" class="graphic"></div>
         <div id="model-view" class="model-view" hidden>
           <div class="model-toolbar">
-            <nav class="seg" aria-label="Morphology time">
-              <button type="button" data-model="preview" aria-pressed="true">Preview</button>
-              <button type="button" data-model="actual" aria-pressed="false">This run</button>
-            </nav>
             <nav class="seg" aria-label="Morphology appearance">
               <button type="button" data-rendering="sem" aria-pressed="true">SEM</button>
               <button type="button" data-rendering="grains" aria-pressed="false">Grains</button>
@@ -135,17 +131,17 @@
         </div>
         <div id="lightbox-view" class="lightbox-view" hidden>
           <div class="model-toolbar">
-            <nav class="seg" aria-label="Lightbox film state">
-              <button type="button" data-finish="final" aria-pressed="true">Final</button>
-              <button type="button" data-finish="actual" aria-pressed="false">This run</button>
-            </nav>
             <nav class="seg" aria-label="Lightbox lighting">
               <button type="button" data-light="studio" aria-pressed="true">Studio</button>
               <button type="button" data-light="raking" aria-pressed="false">Raking</button>
             </nav>
-            <button type="button" class="button view-reset" id="lightbox-reset" aria-label="Reset sample rotation">Reset view</button>
+            <nav class="seg" aria-label="Lightbox background">
+              <button type="button" data-background="dark" aria-pressed="true">Dark</button>
+              <button type="button" data-background="light" aria-pressed="false">Light</button>
+            </nav>
+            <button type="button" class="button view-reset" id="lightbox-reset" aria-label="Reset sample rotation and zoom">Reset view</button>
           </div>
-          <canvas id="film-lightbox" class="micrograph" role="img" aria-label="Rotatable coated sample in a lightbox" tabindex="0"></canvas>
+          <canvas id="film-lightbox" class="micrograph" role="img" aria-label="Rotatable coated sample in a lightbox" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown + -" tabindex="0"></canvas>
           <p id="lightbox-readout" class="instrument-note">Preparing surface…</p>
         </div>
         <div id="zone-view" class="zone-view" hidden>
@@ -173,12 +169,21 @@
       </section>
     </div>
     <dl id="metrics" class="metrics" aria-label="Live readings"></dl>
-    <div class="transport">
-      <button id="run" class="button primary" type="button">Run</button>
-      <button id="reset" class="button" type="button">Reset</button>
-      <progress id="progress" max="60" value="0" aria-label="Simulation progress"></progress>
-      <span id="clock" class="clock">0 / 60 s</span>
-      <span id="run-status" class="run-status" role="status">Ready</span>
+    <div class="experiment-bar" id="experiment-bar">
+      <nav class="seg" id="experiment-mode" aria-label="Film simulation mode">
+        <button type="button" data-mode="preview" aria-pressed="true">Preview</button>
+        <button type="button" data-mode="growth" aria-pressed="false">Growth</button>
+      </nav>
+      <label id="preview-duration" class="preview-duration">
+        <span>Preview time</span><input id="preview-time" type="range" min="5" max="180" step="5" value="60" aria-valuetext="60 seconds"><output for="preview-time" id="preview-time-value">60 s</output>
+      </label>
+      <div class="transport" id="growth-transport" hidden>
+        <button id="run" class="button primary" type="button">Run</button>
+        <button id="reset" class="button" type="button">Reset</button>
+        <progress id="progress" max="60" value="0" aria-label="Simulation progress"></progress>
+        <span id="clock" class="clock">0 / 60 s</span>
+        <span id="run-status" class="run-status" role="status">Ready</span>
+      </div>
     </div>
   </main>
 

@@ -70,7 +70,7 @@ function microscopeGL(canvas) {
   return { gl, uniform };
 }
 
-export function paintGrainMap(ctx, model, width, height, fill = .88) {
+function paintGrainMap(ctx, model, width, height, fill = .88) {
   ctx.fillStyle = '#14191f';
   ctx.fillRect(0, 0, width, height);
   if (!model) return;
@@ -105,10 +105,9 @@ export function paintGrainMap(ctx, model, width, height, fill = .88) {
 }
 
 export class FilmMicroscope {
-  constructor(canvas, status, workerCode, onModel) {
+  constructor(canvas, status, workerCode) {
     this.canvas = canvas;
     this.status = status;
-    this.onModel = onModel;
     this.style = 'sem';
     this.rotation = [-.61, .83];
     this.key = '';
@@ -173,7 +172,7 @@ export class FilmMicroscope {
   request(key, segments, reference) {
     if (this.key === key) return;
     this.key = key;
-    const request = { key, segments, reference };
+    const request = { segments, reference };
     if (this.busy) this.next = request;
     else this.dispatch(request);
   }
@@ -187,7 +186,6 @@ export class FilmMicroscope {
 
   display(model) {
     this.model = model;
-    this.modelKey = this.active.key;
     this.busy = false;
     if (this.gpu) {
       const { gl } = this.gpu;
@@ -195,7 +193,6 @@ export class FilmMicroscope {
     }
     this.updateReadout();
     this.draw();
-    this.onModel?.();
     if (this.next) {
       const request = this.next;
       this.next = undefined;

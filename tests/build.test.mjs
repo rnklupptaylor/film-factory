@@ -25,4 +25,11 @@ test('build emits the self-contained app with its teaching version', () => {
   assert.equal(result.roughnessNm, 0);
   assert.equal(result.mesh, undefined);
   assert.match(page, /id="film-lightbox"/);
+  assert.match(page, /data-background="light"/);
+  assert.deepEqual([...page.matchAll(/data-plot="(\w+)" aria-pressed/g)].map(([, view]) => view),
+    ['source', 'growth', 'profile', 'morphology', 'zones', 'diagnostics', 'lightbox']);
+  assert.match(page, /id="material"[\s\S]*?id="wafer"[\s\S]*?id="control-pages"/);
+  assert.match(page, /id="preview-time".*min="5" max="180" step="5" value="60"/);
+  assert.match(page, /id="growth-transport" hidden/);
+  assert.doesNotMatch(page, /id="chamber-grains"/);
 });

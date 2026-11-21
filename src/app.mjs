@@ -5,7 +5,7 @@ import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
 import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gasReadings, processGas, chamberPressure, pressureGauge } from './instruments.mjs';
 import { growthConditions } from './microstructure.mjs';
-import { FilmMicroscope, paintGrainMap } from './microscope.mjs';
+import { FilmMicroscope } from './microscope.mjs';
 import { FilmLightbox } from './lightbox.mjs';
 import { zoneDiagramMarkup, zoneModel } from './zones.mjs';
 
@@ -19,6 +19,7 @@ const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
 const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
 const transport = new ChamberTransport();
+const bareFilm = POSITIONS.map(() => 0);
 
 let page = 'home';
 let family = 'evaporation';
@@ -30,10 +31,12 @@ let sample = rates(config, settings, material);
 let controlPage = 0;
 let plot = 'growth';
 let theoryPage = 0;
+let experimentMode = 'preview';
+let previewTime = Number(el('preview-time').value);
 let running = false;
 let gasLeadIn = 0;
 let seconds = 0;
-let thickness = POSITIONS.map(() => 0);
+let thickness = bareFilm;
 let history = [[0, 0]];
 let residue = 1;
 let residueHistory = [[0, 100]];
@@ -44,14 +47,17 @@ let frame = 0;
 let manualTheme = false;
 let chamber;
 let microscope;
-let lightbox, lightboxMode = 'final';
+let lightbox;
 let filmSurface;
-let modelMode = 'auto', modelStyle = 'sem', sensorMode = 'qcm', tooling = 100;
+let modelStyle = 'sem', sensorMode = 'qcm', tooling = 100;
 let growthLog = [], growthDuration = 0, growthReference = 0, modelRun = 0;
 let qcmMass = 0, qcmThickness = 0, qcmHistory = [[0,0]];
 let growthInput = growthConditions(config, settings, sample);
 let crystalInput = crystalReading(config, settings, sample);
 const isPreclean = () => config.classic && settings.preclean;
+const isPreview = () => experimentMode === 'preview';
+const visibleProfile = () => isPreview() ? advanceFilm(bareFilm, sample, previewTime) : thickness;
+const visibleResidue = () => isPreview() ? residueAfter(1, sample, previewTime) : residue;
 const valveOpen = () => running && chamber.feed != null && (!chamber.feed.gun || settings.ionCurrent > 0);
 const readPressure = () => chamberPressure(settings, chamber.feed, transport.fill);
 
@@ -142,6 +148,7 @@ function renderControls() {
   el('material').innerHTML = config.materials.map((symbol) => option(symbol, `${displaySymbol(symbol)} · ${MATERIALS[symbol].name}`)).join('');
   el('material').value = settings.symbol;
   el('material').disabled = config.materials.length === 1;
+  el('wafer').value = settings.wafer;
   el('hardware-note').textContent = config.hardware;
   for (const id of ['preclean', 'compact-preclean']) {
     const button = el(id);
@@ -149,14 +156,12 @@ function renderControls() {
     button.textContent = isPreclean() ? 'Deposit' : 'Pre-clean';
     button.title = isPreclean() ? 'Switch on the coating source for deposition' : 'Switch off the coating source for Ar⁺ pre-cleaning';
   }
-  document.querySelector('[data-plot="growth"]').textContent = isPreclean() ? 'Residue' : 'Growth';
   renderSliders();
 }
 
 function renderSliders() {
   const groups = controlGroups(config, material);
-  const thirdGroup = config.family === 'plating' ? 'Geometry' : config.ito || config.reactive ? 'Film & gas' : config.duty ? 'Film & pulses' : 'Film';
-  const names = ['Source', 'Chamber', thirdGroup];
+  const names = ['Source', 'Chamber'];
   el('control-pages').innerHTML = groups.map((_, i) => `<button type="button" data-group="${i}" aria-pressed="${i === controlPage}">${names[i]}</button>`).join('');
   const controls = groups[controlPage];
   el('sliders').innerHTML = controls.map(([key, label, symbol, min, max, step, unit]) => {
@@ -164,10 +169,7 @@ function renderSliders() {
     const value = disabled ? 'Source off' : controlValue(key, settings[key], unit);
     return `<div class="slider"><label for="setting-${key}"><span>${label} <i>${symbol}</i></span><output id="value-${key}" for="setting-${key}">${value}</output></label>
       <input id="setting-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" data-key="${key}" data-unit="${unit}" aria-valuetext="${value}" ${disabled ? 'disabled' : ''}></div>`;
-  }).join('') + (controls.some(([key]) => key === 'substrate')
-    ? `<label class="wafer-control"><span>Substrate</span><select id="wafer" aria-describedby="substrate-limit">${Object.entries(SUBSTRATES).map(([id, substrate]) => option(id, substrate.name)).join('')}</select><span id="substrate-limit" class="wafer-limit"></span></label>`
-    : '');
-  if (el('wafer')) el('wafer').value = settings.wafer;
+  }).join('');
   renderThermalWarning();
 }
 
@@ -184,7 +186,6 @@ function setupChamber() {
     plasma: el('plasma-glow'), beam: el('electron-guide'),
     coil: el('holder-coil'), valve: el('gas-valve-state'), lamp: el('gas-valve-lamp'),
     species: el('gas-species'), gunFeed: el('gun-gas-path'),
-    grainInset: el('film-grain-inset'), grainCanvas: el('chamber-grain-map'), grainMeta: el('grain-inset-meta'),
   };
   const hasIons = family !== 'evaporation';
   const ionText = config.arc ? 'Ti ions' : 'Ar⁺';
@@ -193,7 +194,6 @@ function setupChamber() {
     + (variant === 'ebeam' ? '<span><i class="electron"></i> Electrons</span>' : '')
     + (family === 'plating' ? `<span><i class="removed"></i> ${isPreclean() ? 'Material removed' : 'Resputtered atoms'}</span>` : '')
     + (family === 'evaporation' ? '' : '<span id="gas-legend"></span>');
-  renderGrainInset();
 }
 
 function renderChamber() {
@@ -210,34 +210,12 @@ function renderChamber() {
   drawChamberMotion();
 }
 
-function renderGrainInset() {
-  const enabled = modelStyle === 'grains';
-  chamber.grainInset.setAttribute('visibility', enabled ? 'visible' : 'hidden');
-  if (!enabled) return;
-  const canvas = chamber.grainCanvas;
-  const key = microscope?.key ?? '';
-  const displayed = microscope?.modelKey ?? '';
-  const current = displayed === key
-    || (key.startsWith('actual|') && key.split('|', 2).join('|') === displayed.split('|', 2).join('|'));
-  const model = current ? microscope?.model : null;
-  if (model === chamber.insetModel) return;
-  chamber.insetModel = model;
-  const ctx = canvas.getContext('2d');
-  if (ctx) paintGrainMap(ctx, model, canvas.width, canvas.height, .98);
-  const time = displayed.startsWith('preview|') ? '60 s forecast' : 'This run';
-  const label = !model ? 'Updating…' : !model.count ? 'Bare substrate'
-    : !model.grainCount ? 'Amorphous' : time;
-  chamber.grainMeta.textContent = label;
-  canvas.setAttribute('aria-label', model?.grainCount
-    ? `Top view, ${time}, ${model.grainCount} exposed grains.` : `Top view. ${label}.`);
-}
-
 function drawChamberSurface() {
-  const h = waferCentre(thickness);
+  const h = waferCentre(visibleProfile());
   const height = Math.min(19, 3 * Math.log1p(h));
   chamber.film.setAttribute('height', height);
   chamber.filmLabel?.setAttribute('visibility', h > .01 ? 'visible' : 'hidden');
-  chamber.residue?.setAttribute('opacity', residue * Math.max(0, 1 - height / 3.5));
+  chamber.residue?.setAttribute('opacity', visibleResidue() * Math.max(0, 1 - height / 3.5));
 }
 
 function drawChamberMotion() {
@@ -262,13 +240,13 @@ function drawChamberMotion() {
     }
   }
   const powerText = running ? gasLeadIn ? 'Gas stabilising' : isPreclean() ? 'Pre-clean · source off' : 'Power on'
-    : transport.visible ? 'Power off · fading' : 'Standby';
+    : transport.visible ? 'Power off · fading' : isPreview() ? 'Preview' : 'Standby';
   if (chamber.power.textContent !== powerText) chamber.power.textContent = powerText;
   if (chamber.ctx) transport.draw(chamber.ctx);
 }
 
 function renderMetrics() {
-  const h = waferCentre(thickness);
+  const h = waferCentre(visibleProfile());
   const lambda = sample.lambda;
   const lambdaLabel = lambda >= 1 ? [number(lambda, 1), 'm'] : lambda >= .012 ? [number(lambda * 100, 1), 'cm'] : [number(lambda * 1000, 1), 'mm'];
   const specific = family === 'evaporation'
@@ -282,7 +260,7 @@ function renderMetrics() {
       : ['Substrate ion energy Eᵢ', number(sample.ionEnergy, 0), 'eV'];
   const values = [
     isPreclean() ? ['Incoming deposition', '0', 'nm/s'] : [family === 'plating' ? 'Net growth Rₙₑₜ' : 'Deposition rate R', rateNumber(sample.net), 'nm/s'],
-    isPreclean() ? ['Surface residue', number(residue * 100, 1), '%'] : ['Centre thickness h', h > 0 && h < .01 ? sci(h) : number(h, 1), 'nm'],
+    isPreclean() ? ['Surface residue', number(visibleResidue() * 100, 1), '%'] : ['Centre thickness h', h > 0 && h < .01 ? sci(h) : number(h, 1), 'nm'],
     ['Mean free path λ', ...lambdaLabel],
     specific,
   ];
@@ -310,11 +288,12 @@ function renderSource() {
       : config.reactive ? `Modelled target coverage by compound ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
       : material.yields ? 'Approximate Ar⁺ yield for normal incidence on the selected metal.' : 'Effective rate model for an insulating silica target at 13.56 MHz.';
   } else if (isPreclean()) {
-    const h = waferCentre(thickness);
-    const cleared = (conditions) => 100 * (1 - residueAfter(1, conditions, RUN_LENGTH, h));
+    const h = isPreview() ? 0 : waferCentre(thickness);
+    const duration = isPreview() ? previewTime : RUN_LENGTH;
+    const cleared = (conditions) => 100 * (1 - residueAfter(1, conditions, duration, h));
     const points = rows.map(([x, state]) => [x, cleared(state)]);
     graph = { lines: [{ points }], yDomain: [0,100], marker: [settings.bias, cleared(sample)] };
-    caption = 'Projected fraction of remaining residue cleared in a 60 s clean. Any deposited film shields the substrate until removed.';
+    caption = `Fraction of remaining residue cleared in a ${duration} s clean. Deposited film shields the substrate until removed.`;
   } else {
     const incoming = rows.map(([x, state]) => [x,state.gross]);
     const removal = rows.map(([x, state]) => [x,state.loss]);
@@ -325,40 +304,46 @@ function renderSource() {
 }
 
 function renderResiduePlot() {
-  const measured = [...residueHistory, [seconds, residue * 100]];
-  const forecast = Array.from({ length: 41 }, (_, i) => {
-    const dt = (RUN_LENGTH - seconds) * i / 40;
-    return [seconds + dt, 100 * residueAfter(residue, sample, dt, waferCentre(thickness))];
-  });
+  const points = isPreview()
+    ? Array.from({ length: 41 }, (_, i) => {
+        const time = previewTime * i / 40;
+        return [time, 100 * residueAfter(1, sample, time)];
+      })
+    : [...residueHistory, [seconds, residue * 100]];
   return {
     title: 'Surface residue',
     markup: chartMarkup({
       title: 'Surface residue remaining at the centre', xLabel: 'Time t (s)', yLabel: 'Residue remaining (%)',
-      xDomain: [0, RUN_LENGTH], yDomain: [0, 100], lines: [{ points: measured }, { points: forecast, dashed: true }],
-      marker: measured.at(-1),
+      xDomain: [0, isPreview() ? previewTime : RUN_LENGTH], yDomain: [0, 100], lines: [{ points }],
+      marker: points.at(-1),
     }),
-    caption: 'Modelled residue at the centre. The dashed curve projects the current bias and ion current.',
+    caption: isPreview() ? 'Projected surface cleaning at the current bias and ion current.' : 'Surface residue at the centre during this run.',
+  };
+}
+
+function surfaceInput() {
+  if (isPreview()) return {
+    key: `preview|${previewTime}|${JSON.stringify(growthInput)}`,
+    segments: [{ ...growthInput, duration: previewTime }],
+    reference: growthInput.gross * previewTime,
+  };
+  return {
+    key: `growth|${modelRun}|${running ? Math.floor(growthDuration / 2) : growthDuration}`,
+    segments: growthLog.map(({ input, ...part }) => part),
+    reference: growthReference,
   };
 }
 
 function renderMorphology() {
   if (!microscope) {
-    microscope = new FilmMicroscope(el('micrograph'), el('model-readout'), morphologyWorkerCode, renderGrainInset);
+    microscope = new FilmMicroscope(el('micrograph'), el('model-readout'), morphologyWorkerCode);
     microscope.setStyle(modelStyle);
     el('model-view').querySelectorAll('[data-camera]').forEach((button) => { button.disabled = !microscope.gpu; });
   }
-  const mode = modelMode === 'auto' ? (growthDuration ? 'actual' : 'preview') : modelMode;
-  pressed(el('model-view'), 'model', mode);
-  const preview = mode === 'preview';
-  const key = preview ? `preview|${JSON.stringify(growthInput)}`
-    : `actual|${modelRun}|${running ? Math.floor(growthDuration / 2) : growthDuration}`;
-  const segments = preview ? [{ ...growthInput, duration: RUN_LENGTH }] : growthLog;
-  const reference = preview ? growthInput.gross * RUN_LENGTH : growthReference;
-  microscope.request(key, segments.map(part => ({...part})), reference);
-  if (modelStyle === 'grains') renderGrainInset();
-  if (plot !== 'morphology') return;
+  const { key, segments, reference } = surfaceInput();
+  microscope.request(key, segments, reference);
   const theta = growthInput.theta == null ? '' : ` · Tₛ/Tₘ ${number(growthInput.theta)}`;
-  el('plot-meta').textContent = `${preview ? '60 s forecast' : 'Accumulated film'}${theta}`;
+  el('plot-meta').textContent = `${isPreview() ? `${previewTime} s preview` : 'This run'}${theta}`;
   const details = modelStyle === 'grains'
     ? 'Colours mark individual grains. Diameter uses exposed area in grid cells.'
     : `${microscope.gpu ? 'Drag or use arrow keys to rotate.' : 'Surface height map.'} RMS roughness comes from modelled heights.`;
@@ -370,33 +355,23 @@ function renderMorphology() {
 function selectModelStyle(style) {
   modelStyle = style;
   pressed(el('model-view'), 'rendering', style);
-  el('chamber-grains').setAttribute('aria-pressed', String(style === 'grains'));
-  microscope?.setStyle(style);
+  microscope.setStyle(style);
   renderPlot();
-  if (style === 'sem') renderGrainInset();
 }
 
 function renderLightbox() {
   if (!lightbox) lightbox = new FilmLightbox(el('film-lightbox'), el('lightbox-readout'), morphologyWorkerCode);
-  const remaining = lightboxMode === 'final' ? RUN_LENGTH - seconds : 0;
-  const steady = remaining > 0 && (growthLog.length === 0 || (growthLog.length === 1 && growthLog[0].input === growthInput));
-  const timeline = steady ? 'steady' : running ? Math.floor(seconds / 2) : seconds;
-  const key = `${lightboxMode}|${modelRun}|${timeline}|${JSON.stringify(growthInput)}|${sample.film.name}`;
+  const { key: surfaceKey, segments, reference } = surfaceInput();
+  const film = isPreview() ? sample.film : filmSurface ?? sample.film;
+  const key = `${surfaceKey}|${settings.wafer}|${film.name}`;
+  const name = isPreview() ? `${previewTime} s preview` : 'This run';
   if (key !== lightbox.key) {
-    const segments = growthLog.map(({ input, ...part }) => part);
-    if (remaining > 0) {
-      if (growthLog.at(-1)?.input === growthInput) segments.at(-1).duration += remaining;
-      else segments.push({ ...growthInput, duration: remaining });
-    }
-    const profile = remaining > 0 ? advanceFilm(thickness, sample, remaining) : thickness;
-    const film = remaining > 0 && sample.net > 0 ? sample.film : filmSurface ?? sample.film;
-    lightbox.request({ key, profile, film, wafer: settings.wafer, name: lightboxMode === 'final' ? 'Projected final film' : 'This run',
-      input: { segments, reference: growthReference || growthInput.gross * RUN_LENGTH, summaryOnly: true } });
+    lightbox.request({ key, profile: visibleProfile(), film, wafer: settings.wafer, name,
+      input: { segments, reference, summaryOnly: true } });
   }
-  el('plot-meta').textContent = lightboxMode === 'final' ? 'Projected at 60 s' : 'Film so far';
-  el('plot-caption').textContent = lightbox.gpu
-    ? 'Drag or use arrow keys to rotate. Roughness, gaps and porosity drive the illustrated finish.'
-    : 'Simplified surface view. Drag or use arrow keys to tilt the sample.';
+  el('plot-meta').textContent = name;
+  el('plot-caption').textContent = lightbox.gpu ? 'Drag to rotate. Scroll or pinch to zoom.'
+    : 'Simplified surface view. Drag to tilt. Scroll or pinch to zoom.';
 }
 
 function renderZoneModel() {
@@ -416,7 +391,7 @@ function showZoneNotes() {
   el('dialog-title').textContent = model.name;
   const sources = model.links.map(([label, url]) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('');
   el('dialog-content').innerHTML = `<p><strong>${model.subject}</strong></p><p>${model.detail}</p><p>${model.context}</p>
-    <p>These are the current recipe settings. Morphology records growth as the settings change.</p>${sources}`;
+    <p>The diagram marks the current recipe settings. In Growth mode, the morphology records changes during the run.</p>${sources}`;
   el('dialog-nav').hidden = true;
   el('dialog').showModal();
 }
@@ -429,19 +404,21 @@ function renderInstruments() {
   const body = el('sensor-body');
   el('qcm-tooling').hidden = sensorMode !== 'qcm';
   if (sensorMode === 'qcm') {
-    el('plot-meta').textContent = '6 MHz quartz';
-    const shift = crystalFrequencyShift(qcmMass);
-    const observed = [...qcmHistory, [seconds,shift]];
-    const end = crystalFrequencyShift(qcmMass + crystalInput.massRate * (RUN_LENGTH - seconds));
-    const ymin = Math.min(-1, shift, end, ...qcmHistory.map(point => point[1])) * 1.08;
+    el('plot-meta').textContent = isPreview() ? `6 MHz quartz · ${previewTime} s preview` : '6 MHz quartz';
+    const time = isPreview() ? previewTime : seconds;
+    const mass = isPreview() ? crystalInput.massRate * time : qcmMass;
+    const crystalHeight = isPreview() ? crystalInput.thicknessRate * time : qcmThickness;
+    const shift = crystalFrequencyShift(mass);
+    const points = [...(isPreview() ? [[0, 0]] : qcmHistory), [time, shift]];
+    const ymin = Math.min(-1, ...points.map(point => point[1])) * 1.08;
     body.innerHTML = instrumentCards([
       ['Frequency shift Δf', `${number(shift, 1)} Hz`],
-      ['Areal mass', `${number(qcmMass * 1e5, 2)} µg/cm²`],
-      ['QCM indicated h', `${number(qcmThickness * tooling / 100, 1)} nm`],
-      ['Wafer net h', `${number(waferCentre(thickness), 1)} nm`],
+      ['Areal mass', `${number(mass * 1e5, 2)} µg/cm²`],
+      ['QCM indicated h', `${number(crystalHeight * tooling / 100, 1)} nm`],
+      ['Wafer net h', `${number(waferCentre(visibleProfile()), 1)} nm`],
     ]) + `<div class="graphic">${chartMarkup({ title:'Quartz frequency shift', xLabel:'Time t (s)', yLabel:'Δf (Hz)',
-      xDomain:[0,RUN_LENGTH], yDomain:[ymin,0],
-      lines:[{points:observed},{points:[[seconds,shift],[RUN_LENGTH,end]],dashed:true}], marker:[seconds,shift] })}</div>`;
+      xDomain:[0,isPreview() ? previewTime : RUN_LENGTH], yDomain:[ymin,0],
+      lines:[{ points }], marker:[time,shift] })}</div>`;
     el('tooling-value').value = `${tooling}%`;
     el('plot-caption').textContent = Math.abs(shift) > 60000
       ? 'Heavy crystal loading. The linear Sauerbrey estimate is less reliable in this range.'
@@ -449,19 +426,19 @@ function renderInstruments() {
     return;
   }
   if (sensorMode === 'vacuum') {
-    const readout = gasReadings(config, settings, readPressure());
-    el('plot-meta').textContent = 'Chamber & holder';
+    const readout = gasReadings(config, settings, isPreview() ? 10 ** settings.pressure : readPressure());
+    el('plot-meta').textContent = isPreview() ? 'Working conditions' : 'Chamber & holder';
     body.innerHTML = instrumentCards([
       [pressureGauge(readout.total), `${sci(readout.total, 2)} mbar`],
       ['Holder thermocouple', `${settings.substrate} K`],
       ...readout.gases.map(([gas, pressure]) => [`RGA · p(${gas})`, pressure ? `${sci(pressure)} mbar` : '0 mbar']),
-    ]) + `<p class="instrument-note">${readout.gases.length ? 'Partial pressures follow the selected gas mixture as the chamber fills and pumps down. An RGA at process pressure requires differential pumping.' : readout.localGas ?? 'Residual gas composition is unspecified for this preset.'}</p>`;
+    ]) + `<p class="instrument-note">${readout.gases.length ? 'Partial pressures use the selected gas mixture. An RGA at process pressure requires differential pumping.' : readout.localGas ?? 'Residual gas composition is unspecified for this preset.'}</p>`;
     el('plot-caption').textContent = 'Modelled gauge and thermocouple. The holder sensor follows the selected Tₛ.';
     return;
   }
-  el('plot-meta').textContent = 'Discharge';
+  el('plot-meta').textContent = isPreview() ? 'Discharge at working conditions' : 'Discharge';
   const readings = [];
-  const discharge = running && !gasLeadIn;
+  const discharge = isPreview() || (running && !gasLeadIn);
   if (family === 'sputtering') readings.push(['Effective target ion current', `${number(discharge ? settings.current * (config.duty ? settings.duty / 100 : 1) : 0)} A`]);
   if (family === 'plating') readings.push(['Substrate ion current density', `${number(discharge ? settings.ionCurrent : 0)} mA/cm²`]);
   if (config.reactive) readings.push(['OES · Relative Ti emission', discharge ? `${number(100 * (1 - .63 * sample.poisoning), 1)}%` : 'Off']);
@@ -478,8 +455,7 @@ function renderPlot() {
   el('zone-view').hidden = plot !== 'zones';
   el('sensor-view').hidden = plot !== 'diagnostics';
   el('graphic').hidden = ['morphology', 'diagnostics', 'lightbox', 'zones'].includes(plot);
-  if (plot === 'morphology' || modelStyle === 'grains') renderMorphology();
-  if (plot === 'morphology') return;
+  if (plot === 'morphology') { renderMorphology(); return; }
   if (plot === 'lightbox') { renderLightbox(); return; }
   if (plot === 'zones') { renderZoneModel(); return; }
   if (plot === 'diagnostics') { renderInstruments(); return; }
@@ -487,13 +463,15 @@ function renderPlot() {
   if (plot === 'growth' && isPreclean()) {
     view = renderResiduePlot();
   } else if (plot === 'growth') {
-    view = { title: 'Centre', markup: growthPlot([...history, [seconds, waferCentre(thickness)]], seconds, sample.net),
-      caption: seconds < RUN_LENGTH ? 'Solid line shows this run. Dashes project the current settings to 60 s.' : 'Finished run. The line records centre thickness as the settings changed.' };
+    const h = waferCentre(visibleProfile());
+    const points = isPreview() ? [[0, 0], [previewTime, h]] : [...history, [seconds, h]];
+    view = { title: 'Centre', markup: growthPlot(points, isPreview() ? previewTime : RUN_LENGTH),
+      caption: isPreview() ? 'Projected centre thickness at the current settings.' : 'Centre thickness as the settings change during this run.' };
   } else if (plot === 'profile') {
-    const forecast = advanceFilm(thickness, sample, RUN_LENGTH - seconds);
-    const centre = waferCentre(forecast);
-    const edge = centre > 0 ? `Projected edge / centre ${number(forecast[0] / centre * 100, 0)}%.` : 'The projected wafer is bare.';
-    view = { title: '100 mm wafer', markup: profilePlot(thickness, forecast), caption: seconds < RUN_LENGTH ? `Solid line shows the current film. ${edge}` : `Final thickness across the wafer. ${edge.replace('Projected edge', 'Edge')}` };
+    const profile = visibleProfile();
+    const centre = waferCentre(profile);
+    const edge = centre > 0 ? `Edge / centre ${number(profile[0] / centre * 100, 0)}%.` : 'The wafer is bare.';
+    view = { title: '100 mm wafer', markup: profilePlot(profile), caption: `${isPreview() ? `Profile after ${previewTime} s.` : 'Profile for this run.'} ${edge}` };
   } else {
     view = renderSource();
   }
@@ -520,6 +498,16 @@ function renderClock() {
   el('clock').textContent = `${Math.floor(seconds)} / ${RUN_LENGTH} s`;
 }
 
+function switchExperiment(next) {
+  if (next === experimentMode) return;
+  experimentMode = next;
+  pressed(el('experiment-mode'), 'mode', next);
+  el('preview-duration').hidden = !isPreview();
+  el('growth-transport').hidden = isPreview();
+  if (running) pause();
+  else compute();
+}
+
 function setRunLabel(status, buttonText) {
   el('run-status').textContent = status;
   el('run').textContent = buttonText;
@@ -538,13 +526,12 @@ function restartTimeline() {
 }
 
 function resetRun() {
-  thickness = POSITIONS.map(() => 0);
+  thickness = bareFilm;
   residue = 1;
   growthLog = [];
   growthDuration = 0;
   growthReference = 0;
   filmSurface = undefined;
-  modelMode = 'auto';
   modelRun++;
   qcmMass = qcmThickness = 0;
   restartTimeline();
@@ -599,7 +586,6 @@ function trackFilm(elapsed, now) {
     drawChamberSurface();
     renderMetrics();
     if (plot !== 'source' && plot !== 'zones' && (plot !== 'diagnostics' || sensorMode !== 'vacuum')) renderPlot();
-    else if (modelStyle === 'grains') renderMorphology();
   }
 }
 
@@ -628,6 +614,7 @@ function scheduleFrame() {
 }
 
 function switchRun() {
+  if (isPreview()) return;
   if (running) { pause(); return; }
   if (seconds >= RUN_LENGTH) resetRun();
   running = true;
@@ -650,7 +637,7 @@ function switchPreclean() {
 
 function openGuide() {
   el('dialog-title').textContent = 'Try it';
-  el('dialog-content').innerHTML = `<p>${TECHNIQUES[family].summary}</p><p>${config.prompt}</p><p class="citation">The sliders update the readings instantly. Run to build a film and compare the growth or wafer profile.</p>`;
+  el('dialog-content').innerHTML = `<p>${TECHNIQUES[family].summary}</p><p>${config.prompt}</p><p class="citation">Use Preview to see the estimated film at the selected time. Select Growth and press Run to watch the deposition and change settings as it proceeds.</p>`;
   el('dialog-nav').hidden = true;
   el('dialog').showModal();
 }
@@ -681,6 +668,12 @@ el('techniques').addEventListener('click', (event) => {
 });
 el('variant').addEventListener('change', (event) => chooseVariant(event.target.value));
 el('material').addEventListener('change', (event) => chooseMaterial(event.target.value));
+el('wafer').innerHTML = Object.entries(SUBSTRATES).map(([id, substrate]) => option(id, substrate.name)).join('');
+el('wafer').addEventListener('change', (event) => {
+  settings.wafer = event.target.value;
+  resetRun();
+  compute(true);
+});
 el('control-pages').addEventListener('click', (event) => {
   const target = event.target.closest('[data-group]');
   if (!target) return;
@@ -699,12 +692,6 @@ el('sliders').addEventListener('input', (event) => {
   control.setAttribute('aria-valuetext', value);
   compute(key === 'distance');
 });
-el('sliders').addEventListener('change', (event) => {
-  if (event.target.id !== 'wafer') return;
-  settings.wafer = event.target.value;
-  resetRun();
-  compute(true);
-});
 document.querySelector('.plot-nav').addEventListener('click', (event) => {
   const target = event.target.closest('[data-plot]');
   if (!target) return;
@@ -719,12 +706,20 @@ document.querySelector('.mobile-nav').addEventListener('click', (event) => {
   pressed(event.currentTarget, 'mobile', target.dataset.mobile);
 });
 el('run').addEventListener('click', switchRun);
+el('experiment-mode').addEventListener('click', (event) => {
+  const { mode } = event.target.dataset;
+  if (mode) switchExperiment(mode);
+});
+el('preview-time').addEventListener('input', (event) => {
+  previewTime = Number(event.target.value);
+  el('preview-time-value').value = `${previewTime} s`;
+  event.target.setAttribute('aria-valuetext', `${previewTime} seconds`);
+  drawChamberSurface();
+  renderMetrics();
+  renderPlot();
+});
 el('thermal-warning').addEventListener('click', showThermalDetails);
 el('model-view').addEventListener('click', (event) => {
-  if (event.target.dataset.model) {
-    modelMode = event.target.dataset.model;
-    renderMorphology();
-  }
   if (event.target.dataset.rendering) selectModelStyle(event.target.dataset.rendering);
   if (event.target.dataset.camera) {
     microscope.setView(event.target.dataset.camera);
@@ -732,11 +727,10 @@ el('model-view').addEventListener('click', (event) => {
   }
 });
 el('lightbox-view').addEventListener('click', (event) => {
-  const { finish, light } = event.target.dataset;
-  if (finish) {
-    lightboxMode = finish;
-    pressed(el('lightbox-view'), 'finish', finish);
-    renderLightbox();
+  const { background, light } = event.target.dataset;
+  if (background) {
+    lightbox.setBackground(background);
+    pressed(el('lightbox-view'), 'background', background);
   }
   if (light) {
     lightbox.setLighting(light);
@@ -751,7 +745,6 @@ el('chamber-labels').addEventListener('click', (event) => {
   button.setAttribute('aria-pressed', String(show));
   el('chamber-art').classList.toggle('hide-labels', !show);
 });
-el('chamber-grains').addEventListener('click', () => selectModelStyle(modelStyle === 'grains' ? 'sem' : 'grains'));
 el('sensor-view').addEventListener('click', (event) => {
   if (!event.target.dataset.sensor) return;
   sensorMode = event.target.dataset.sensor;

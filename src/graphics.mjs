@@ -1,5 +1,4 @@
 import { POSITIONS, WAFER_RADIUS_CM } from './physics.mjs';
-import { RUN_LENGTH } from './content.mjs';
 
 const PALETTE = ['var(--plot)', 'var(--loss)'];
 const range = (n, fn) => Array.from({ length: n }, (_, i) => fn(i));
@@ -41,19 +40,14 @@ export function chartMarkup({ title, xLabel, yLabel, xDomain, yDomain, log = fal
   </svg>`;
 }
 
-export function growthPlot(history, time, net) {
-  const current = history.at(-1)[1];
-  const remaining = RUN_LENGTH - time;
-  const projected = [[time, current], [RUN_LENGTH, Math.max(0, current + net * remaining)]];
-  if (net < 0 && current > 0 && current + net * remaining < 0) projected.splice(1, 0, [time - current / net, 0]);
-  const lines = [{points: history}, { points: projected, dashed: true }];
-  const max = Math.max(.02, ...history.map(p => p[1]), projected.at(-1)[1]);
-  return chartMarkup({ title: 'Film growth at centre', xLabel: 'Time t (s)', yLabel: 'Thickness h (nm)', xDomain: [0,RUN_LENGTH], yDomain: [0,max * 1.13], lines, marker: [time,current] });
+export function growthPlot(history, duration) {
+  const max = Math.max(.02, ...history.map(p => p[1]));
+  return chartMarkup({ title: 'Film growth at centre', xLabel: 'Time t (s)', yLabel: 'Thickness h (nm)', xDomain: [0,duration], yDomain: [0,max * 1.13],
+    lines: [{ points: history }], marker: history.at(-1) });
 }
 
-export function profilePlot(current, forecast) {
-  const measured = POSITIONS.map((x, i) => [x * 10, current[i]]);
-  const projected = POSITIONS.map((x, i) => [x * 10, forecast[i]]);
+export function profilePlot(profile) {
+  const points = POSITIONS.map((x, i) => [x * 10, profile[i]]);
   return chartMarkup({ title: 'Wafer thickness profile', xLabel: 'Position x (mm)', yLabel: 'Thickness h (nm)', xDomain: [-10 * WAFER_RADIUS_CM, 10 * WAFER_RADIUS_CM],
-    yDomain: [0, Math.max(.02, ...current, ...forecast) * 1.13], lines: [{points: projected, dashed: true}, {points: measured}] });
+    yDomain: [0, Math.max(.02, ...profile) * 1.13], lines: [{ points }] });
 }

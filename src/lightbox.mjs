@@ -6,8 +6,8 @@ const FILM_COLOURS = {
   'Indium tin oxide': '#afc8bd', Silica: '#e3eceb',
 };
 const SUBSTRATE_FINISH = {
-  silicon: ['#69748a', .36, .024], borofloat: ['#8ca8a3', .08, .021], silica: ['#b2c4cd', .03, .016],
-  steel: ['#a8b0b4', .75, .21], polycarbonate: ['#b0bcb2', .07, .075], kapton: ['#c77935', .03, .10],
+  silicon: ['#69748a', .36, .024, 0], borofloat: ['#8ca8a3', .08, .021, .92], silica: ['#b2c4cd', .03, .016, .94],
+  steel: ['#a8b0b4', .75, .21, 0], polycarbonate: ['#b0bcb2', .07, .075, .87], kapton: ['#c77935', .03, .10, .45],
 };
 const TRANSPARENT_FILMS = new Set(['Indium tin oxide', 'Silica']);
 
@@ -51,6 +51,9 @@ uniform vec4 baseFinish;
 uniform float substrateRoughness;
 uniform vec4 filmState;
 uniform float raking;
+uniform float lightBackground;
+uniform float baseTransmission;
+uniform float zoom;
 
 const float RADIUS = 1.0;
 const float HALF_THICKNESS = .040;
@@ -79,9 +82,21 @@ float panel(vec3 ray, vec3 aim, vec2 dimensions, float spread) {
   return shape.x*shape.y*smoothstep(.15,.55,facing);
 }
 
+vec3 backdropAt(vec2 pixel) {
+  vec2 field = pixel*vec2(.78,1.);
+  float falloff = exp(-.82*dot(field,field));
+  vec3 dark = mix(vec3(.085,.108,.133),vec3(.27,.31,.35),falloff);
+  vec3 pale = mix(vec3(.74,.79,.84),vec3(.97,.98,.99),falloff);
+  // The bands behind the sample make transmission easy to see.
+  float band = abs(pixel.x + .26*pixel.y + .15);
+  pale *= 1. - .18*(1. - smoothstep(.10,.125,band));
+  vec2 shadow = (pixel + vec2(.00,.49))*vec2(1.48,5.5);
+  return mix(dark,pale,lightBackground) * (1. - mix(.48,.16,lightBackground)*exp(-dot(shadow,shadow)));
+}
+
 void main() {
   vec2 pixel = (2.*gl_FragCoord.xy - viewport) / min(viewport.x, viewport.y);
-  vec3 ray = normalize(vec3(pixel, -1.87));
+  vec3 ray = normalize(vec3(pixel, -1.87*zoom));
   vec3 origin = local(vec3(0.,0.,3.34));
   vec3 direction = local(ray);
   float plane = direction.z < 0. ? HALF_THICKNESS : -HALF_THICKNESS;
@@ -113,11 +128,7 @@ void main() {
     }
   }
   if (depth >= 1e3) {
-    float falloff = exp(-.82*dot(pixel*vec2(.78,1.),pixel*vec2(.78,1.)));
-    vec3 backdrop = mix(vec3(.085,.108,.133),vec3(.27,.31,.35), falloff);
-    vec2 shadow = (pixel + vec2(.00,.49))*vec2(1.48,5.5);
-    backdrop *= 1. - .48*exp(-dot(shadow,shadow));
-    gl_FragColor = vec4(backdrop,1.);
+    gl_FragColor = vec4(backdropAt(pixel),1.);
     return;
   }
 
@@ -161,7 +172,17 @@ void main() {
   float blemish = 1. - opacity*((.40+.14*raking)*pit + (.24*porosity + .16*rough*rough)*mottling);
   vec3 rgb = max(vec3(0.),(diffuse + reflected*fresnel)*blemish);
   rgb = rgb/(1.+.52*rgb);
-  gl_FragColor = vec4(pow(clamp(rgb,0.,1.),vec3(.4545)),1.);
+  vec3 lit = pow(clamp(rgb,0.,1.),vec3(.4545));
+  float transmission = baseTransmission * (1. - opacity*smoothstep(.15,.55,metal));
+  if (transmission < .001) {
+    gl_FragColor = vec4(lit,1.);
+    return;
+  }
+  vec3 filterColour = mix(vec3(1.),pow(clamp(tint,0.,1.),vec3(.4545)),.15+.09*opacity);
+  vec3 throughSample = filterColour * backdropAt(pixel + .024*point.xy);
+  float glare = max(key,fill)*sheen;
+  float reflectedShare = max(fresnel.r,max(fresnel.g,fresnel.b));
+  gl_FragColor = vec4(mix(lit,throughSample,transmission*(1.-reflectedShare)*(1.-.55*glare)),1.);
 }
 `;
 
@@ -191,13 +212,20 @@ function lightboxGL(canvas) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const uniforms = ['viewport','rotation','profileRange','filmFinish','baseFinish','substrateRoughness','filmState','raking'];
+  const uniforms = ['viewport','rotation','profileRange','filmFinish','baseFinish','substrateRoughness',
+    'filmState','raking','lightBackground','baseTransmission','zoom'];
   return { gl, uniform: Object.fromEntries(uniforms.map(name => [name, gl.getUniformLocation(program, name)])) };
 }
 
 function finishChannels(colour, metallic) {
   const channels = colour.slice(1).match(/.{2}/g).map((hex) => (parseInt(hex,16) / 255) ** 2.2);
   return [...channels, metallic];
+}
+
+function pointerSpan(pointers) {
+  if (pointers.size !== 2) return 0;
+  const [[ax,ay],[bx,by]] = pointers.values();
+  return Math.hypot(ax - bx, ay - by);
 }
 
 export class FilmLightbox {
@@ -208,6 +236,8 @@ export class FilmLightbox {
     this.ctx = this.gpu ? null : canvas.getContext('2d');
     this.worker = null;
     this.lighting = 'studio';
+    this.background = 'dark';
+    this.pointers = new Map();
     this.frame = 0;
     this.resetView();
     try {
@@ -225,20 +255,35 @@ export class FilmLightbox {
     } catch { /* Offline fallback uses the same summary calculation. */ }
     new ResizeObserver(() => this.schedule()).observe(canvas);
     canvas.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return;
-      this.drag = [event.pointerId,event.clientX,event.clientY];
+      if (event.button !== 0 || this.pointers.size >= 2) return;
+      this.pointers.set(event.pointerId, [event.clientX, event.clientY]);
       canvas.setPointerCapture(event.pointerId);
     });
     canvas.addEventListener('pointermove', (event) => {
-      if (this.drag?.[0] !== event.pointerId) return;
-      const [,x,y] = this.drag;
-      this.rotate((event.clientX - x) * .013, (event.clientY - y) * .013);
-      this.drag = [event.pointerId,event.clientX,event.clientY];
+      const position = this.pointers.get(event.pointerId);
+      if (!position) return;
+      const [x,y] = position;
+      const span = pointerSpan(this.pointers);
+      this.pointers.set(event.pointerId, [event.clientX, event.clientY]);
+      if (this.pointers.size === 1) this.rotate((event.clientX - x) * .013, (event.clientY - y) * .013);
+      else if (span > 1) this.zoomBy(pointerSpan(this.pointers) / span);
     });
     for (const event of ['pointerup','lostpointercapture','pointercancel']) {
-      canvas.addEventListener(event, () => { this.drag = undefined; this.schedule(); });
+      canvas.addEventListener(event, ({ pointerId }) => {
+        if (this.pointers.delete(pointerId)) this.schedule();
+      });
     }
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1;
+      this.zoomBy(Math.exp(-event.deltaY * unit * .002));
+    }, { passive: false });
     canvas.addEventListener('keydown', (event) => {
+      if (['+','=','-'].includes(event.key)) {
+        event.preventDefault();
+        this.zoomBy(event.key === '-' ? 1/1.15 : 1.15);
+        return;
+      }
       const step = { ArrowLeft: [-.14,0], ArrowRight: [.14,0], ArrowUp: [0,-.14], ArrowDown: [0,.14] }[event.key];
       if (!step) return;
       event.preventDefault();
@@ -248,6 +293,12 @@ export class FilmLightbox {
 
   resetView() {
     this.angles = [-.21,-.51];
+    this.zoom = 1;
+    this.schedule();
+  }
+
+  zoomBy(factor) {
+    this.zoom = Math.max(.60, Math.min(3.2, this.zoom * factor));
     this.schedule();
   }
 
@@ -278,8 +329,10 @@ export class FilmLightbox {
     this.appearance = appearance;
     this.filmColour = FILM_COLOURS[film.name] ?? film.colour;
     const transparent = TRANSPARENT_FILMS.has(film.name);
-    const [substrateColour, substrateMetal, substrateRoughness] = SUBSTRATE_FINISH[wafer] ?? SUBSTRATE_FINISH.silicon;
+    const [substrateColour, substrateMetal, substrateRoughness, transmission] = SUBSTRATE_FINISH[wafer] ?? SUBSTRATE_FINISH.silicon;
     this.substrateColour = substrateColour;
+    this.transmission = transmission;
+    this.transparentFilm = transparent;
     const finish = appearance.bare ? 'Bare substrate'
       : `${film.formula ?? film.name} · ${appearance.centre.toFixed(1)} nm centre · ${appearance.edge.toFixed(1)} nm edge`;
     const surface = appearance.bare ? '' : ` · RMS ${appearance.roughnessNm.toFixed(1)} nm`;
@@ -295,6 +348,7 @@ export class FilmLightbox {
       gl.uniform4fv(uniform.filmFinish, finishChannels(this.filmColour, transparent ? .04 : .82));
       gl.uniform4fv(uniform.baseFinish, finishChannels(substrateColour, substrateMetal));
       gl.uniform1f(uniform.substrateRoughness, substrateRoughness);
+      gl.uniform1f(uniform.baseTransmission, transmission);
       gl.uniform4f(uniform.filmState, roughness, coverage, voidFraction, -Math.expm1(-scatter));
     }
     this.schedule();
@@ -311,6 +365,12 @@ export class FilmLightbox {
     this.schedule();
   }
 
+  setBackground(background) {
+    this.background = background;
+    this.canvas.dataset.background = background;
+    this.schedule();
+  }
+
   schedule() {
     if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.draw(); });
   }
@@ -318,8 +378,9 @@ export class FilmLightbox {
   draw() {
     const { canvas, appearance } = this;
     if (!appearance || !canvas.clientWidth || !canvas.clientHeight) return;
-    const pixelLimit = this.drag ? 260000 : 780000;
-    const density = Math.min(this.drag ? 1.45 : 1.75, devicePixelRatio || 1, Math.sqrt(pixelLimit / (canvas.clientWidth * canvas.clientHeight)));
+    const moving = this.pointers.size > 0;
+    const pixelLimit = moving ? 260000 : 780000;
+    const density = Math.min(moving ? 1.45 : 1.75, devicePixelRatio || 1, Math.sqrt(pixelLimit / (canvas.clientWidth * canvas.clientHeight)));
     const width = Math.max(1, Math.round(canvas.clientWidth * density));
     const height = Math.max(1, Math.round(canvas.clientHeight * density));
     if (canvas.width !== width) canvas.width = width;
@@ -331,6 +392,8 @@ export class FilmLightbox {
     const [yaw,pitch] = this.angles;
     gl.uniform4f(uniform.rotation,Math.cos(yaw),Math.sin(yaw),Math.cos(pitch),Math.sin(pitch));
     gl.uniform1f(uniform.raking, Number(this.lighting === 'raking'));
+    gl.uniform1f(uniform.lightBackground, Number(this.background === 'light'));
+    gl.uniform1f(uniform.zoom, this.zoom);
     gl.drawArrays(gl.TRIANGLES,0,3);
   }
 
@@ -339,10 +402,14 @@ export class FilmLightbox {
     if (!ctx) return;
     const [yaw,pitch] = this.angles;
     const roundness = Math.cos(yaw) * Math.cos(pitch);
-    const radius = Math.min(width,height) * .30;
+    const radius = Math.min(width,height) * .30 * this.zoom;
     const colour = this.appearance.bare || roundness < 0 ? this.substrateColour : this.filmColour;
-    ctx.fillStyle = '#242d36';
+    ctx.fillStyle = this.background === 'light' ? '#e5ecef' : '#242d36';
     ctx.fillRect(0,0,width,height);
+    if (this.background === 'light') {
+      ctx.fillStyle = '#c1cdd7';
+      ctx.fillRect(width/2 - height*.13,0,height*.12,height);
+    }
     ctx.save();
     ctx.translate(width/2,height/2);
     ctx.rotate(.45*Math.sin(yaw));
@@ -361,7 +428,10 @@ export class FilmLightbox {
     ctx.lineWidth = Math.max(1,radius*.025);
     ctx.beginPath();
     ctx.arc(0,0,radius,0,Math.PI*2);
+    const opaqueCoating = this.transparentFilm ? 0 : this.appearance.coverage * -Math.expm1(-this.appearance.peak / 6);
+    ctx.globalAlpha = 1 - this.transmission * (1 - (roundness > 0 ? opaqueCoating : 0)) * .78;
     ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.stroke();
     if (roundness > 0 && !this.appearance.bare) {
       const flaws = Math.round(100 * (1 - this.appearance.coverage + this.appearance.voidFraction));

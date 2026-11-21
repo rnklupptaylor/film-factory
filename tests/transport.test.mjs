@@ -171,19 +171,20 @@ test('the holder has its own heater and a distinct rendering for each substrate'
   assert.equal(substrates.size, Object.keys(SUBSTRATES).length);
 });
 
-test('chamber object names have leaders and the film grain inset starts hidden', () => {
+test('chamber callouts lead to their components and the OES arrow stays outside the chamber', () => {
   const { config, settings, material, sample } = scene('diode');
   const diagram = chamberMarkup(config, 'diode', settings, material, sample.film);
   const groups = [...diagram.matchAll(/<g class="chamber-annotation">([\s\S]*?)<\/g>/g)];
-  for (const name of ['Substrate', 'Substrate holder', 'Target', 'To pump']) {
+  for (const name of ['Substrate', 'Substrate holder', 'Target', 'To pump', 'OES']) {
     const group = groups.find(([, content]) => content.includes(`>${name}</text>`));
     assert.ok(group && /class="annotation-arrow"/.test(group[1]), name);
   }
   const waferLabel = groups.find(([, content]) => content.includes('>Substrate</text>'))[1];
   assert.match(waferLabel, /y="190".*>Substrate<\/text>/);
   assert.match(waferLabel, /M396 186h12v-35l-10-19/);
-  assert.match(diagram, /id="film-grain-inset" visibility="hidden"/);
-  assert.match(diagram, /id="chamber-grain-map"/);
+  const oesLabel = groups.find(([, content]) => content.includes('>OES</text>'))[1];
+  assert.match(oesLabel, /M515 191h-24/);
+  assert.doesNotMatch(diagram, /film-grain-inset|chamber-grain-map/);
 });
 
 test('electrodes and supply labels follow the connected circuit', () => {

@@ -171,9 +171,6 @@ select {
 .chamber-art.hide-labels .chamber-annotation { display: none; }
 .chamber-annotation text { paint-order: stroke; stroke: #14253d; stroke-width: 2; stroke-linejoin: round; }
 .annotation-arrow { fill: none; stroke: #b6cbe2; stroke-width: 1.15; stroke-linecap: round; marker-end: url(#annotation-arrowhead); }
-.grain-inset-text { font: 600 11px system-ui, sans-serif; fill: #e7eef9; }
-.grain-inset-meta { font: 10px system-ui, sans-serif; fill: #bdcfe1; }
-#chamber-grain-map { display: block; width: 100%; height: 100%; }
 .chamber-art { background: #162944; }
 .chamber-art svg, .graphic svg { display: block; width: 100%; height: 100%; }
 #chamber-motion { display: block; width: 100%; height: 100%; }
@@ -251,6 +248,7 @@ select {
 .zone-blend { fill: #87949b32; }
 .lightbox-view .view-reset { padding: .2rem .43rem; min-height: 28px; font-size: .76rem; white-space: nowrap; }
 #film-lightbox { background: #232a31; }
+#film-lightbox[data-background="light"] { background: #e5ecef; }
 .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .25rem; }
 .model-toolbar .seg button, .sensor-view .seg button { padding: .2rem .43rem; min-height: 26px; }
 .micrograph { width: 100%; flex: 1; min-height: 0; display: block; background: #141619; border-radius: 7px; cursor: grab; touch-action: none; }
@@ -265,7 +263,7 @@ select {
 .tooling { color: var(--muted); font-size: .8rem; }
 .tooling span { display: flex; justify-content: space-between; }
 .tooling input { display: block; width: 100%; margin: 0; accent-color: var(--accent); }
-.wafer-control { display: grid; gap: .14rem; font-size: .82rem; color: var(--muted); }
+.wafer-control { grid-column: 1 / -1; }
 .wafer-limit { color: var(--muted); font-size: .75rem; }
 .wafer-limit.above-limit { color: #b94b19; font-weight: 720; }
 :root[data-theme="dark"] .wafer-limit.above-limit { color: #ffb078; }
@@ -275,7 +273,12 @@ select {
 .metric dt { color: var(--muted); font-size: .79rem; }
 .metric dd { font: 690 clamp(.92rem, 1.6vw, 1.2rem)/1.3 var(--mono); color: var(--ink); }
 .metric small { font: 500 .72rem system-ui, sans-serif; white-space: nowrap; }
-.transport { display: grid; grid-template-columns: auto auto minmax(2rem, 1fr) auto auto; align-items: center; gap: .55rem; }
+.experiment-bar { display: flex; align-items: center; gap: .65rem; min-width: 0; }
+.experiment-bar > .seg { flex: 0 0 auto; }
+.preview-duration { flex: 1; display: grid; grid-template-columns: auto minmax(0, 1fr) 4ch; align-items: center; gap: .6rem; min-width: 0; color: var(--muted); font-size: .86rem; }
+.preview-duration input { width: 100%; min-width: 0; height: 27px; padding: 0; margin: 0; accent-color: var(--accent); cursor: ew-resize; }
+.preview-duration output { font: 680 .84rem var(--mono); color: var(--accent); text-align: right; white-space: nowrap; }
+.transport { flex: 1; display: grid; grid-template-columns: auto auto minmax(1.5rem, 1fr) auto auto; align-items: center; gap: .55rem; }
 progress { width: 100%; height: .5rem; accent-color: var(--accent); }
 .clock { color: var(--muted); font: .78rem var(--mono); white-space: nowrap; }
 .run-status { color: var(--muted); text-align: right; min-width: 5.8rem; font-size: .88rem; }
@@ -323,7 +326,6 @@ dialog::backdrop { background: #0c1935a0; }
   .slider label { display: grid; align-content: start; font-size: .76rem; gap: .05rem; }
   .slider output { font-size: .73rem; }
   .slider input { height: 22px; margin: 0; }
-  .wafer-control { grid-column: 1 / -1; }
   .wafer-limit { display: none; }
   .hardware-note { display: none; }
   .legend { gap: .55rem; font-size: .73rem; }
@@ -341,6 +343,15 @@ dialog::backdrop { background: #0c1935a0; }
   .primary { min-width: 4.5rem; }
   .run-status { min-width: 0; font-size: .74rem; }
   .clock { font-size: .72rem; }
+}
+@media (max-width: 480px) {
+  .experiment-bar { gap: .4rem; }
+  .experiment-bar:has(#growth-transport:not([hidden])) { flex-wrap: wrap; }
+  .experiment-bar:has(#growth-transport:not([hidden])) .transport { flex-basis: 100%; }
+  .preview-duration { grid-template-columns: minmax(0, 1fr) 5ch; gap: .04rem .3rem; font-size: .74rem; }
+  .preview-duration > span { grid-column: 1; }
+  .preview-duration input { grid-column: 1 / -1; grid-row: 2; height: 19px; }
+  .preview-duration output { grid-column: 2; grid-row: 1; font-size: .75rem; }
 }
 @media (max-width: 360px) {
   .plot-nav button { font-size: .73rem; padding-inline: .20rem; }
@@ -406,6 +417,7 @@ dialog::backdrop { background: #0c1935a0; }
   .controls .panel-header .button { min-height: 21px; }
   .selects, .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .16rem .35rem; }
   .selects label, .slider label, .slider output { font-size: .72rem; }
+  .wafer-limit { display: none; }
   .slider label { display: grid; gap: 0; }
   select { min-height: 26px; }
   .slider input { height: 19px; margin: 0; }

@@ -275,20 +275,12 @@ export function chamberMarkup(config, method, settings, material, film) {
     ${annotation('Substrate', 391, 190, 'M396 186h12v-35l-10-19', { detail: wafer.label, anchor: 'end' })}
     ${annotation('TC', 266, 103, 'M271 101l10 8', { anchor: 'end' })}
     ${annotation('QCM', 439, 184, 'M439 172v-11', { anchor: 'middle' })}
-    ${hasPlasma ? annotation('OES', 465, 204, 'M468 198l5-7', { anchor: 'end' }) : ''}
+    ${hasPlasma ? annotation('OES', 520, 195, 'M515 191h-24') : ''}
     ${config.family === 'sputtering' || config.arc
       ? annotation(config.arc ? 'Ti cathode' : 'Target', 150, y + 5, `M200 ${y + 1}l24 4`, { detail: method === 'rf' ? '− self-bias' : config.ito === 'ceramic' ? 'ITO ceramic' : config.ito ? 'In–Sn alloy' : '' })
       : annotation(method === 'ebeam' ? 'Hearth' : 'Source', 151, y + 7, `M205 ${y + 3}l${method === 'filament' ? 39 : 31} 2`)}
     ${method === 'ebeam' ? annotation('E-gun', 427, y + 31, `M423 ${y + 28}h-11`) : ''}
     ${config.ibad ? annotation('Ion gun', 220, 276, 'M215 271l-22-8') : ''}
     ${product ? `<g id="in-chamber-film-label" visibility="hidden">${annotation(`${product} film`, 330, 174, 'M327 165l-18-27')}</g>` : ''}
-    <g id="film-grain-inset" visibility="hidden">
-      <rect x="502" y="158" width="106" height="136" rx="7" fill="#1e334d" stroke="#89aaca"/>
-      <text class="grain-inset-text" x="555" y="175" text-anchor="middle">Film grains</text>
-      <foreignObject x="511" y="181" width="88" height="88" pointer-events="none">
-        <canvas xmlns="http://www.w3.org/1999/xhtml" id="chamber-grain-map" width="176" height="176" role="img" aria-label="Top view of the film grains"></canvas>
-      </foreignObject>
-      <text class="grain-inset-meta" x="555" y="284" text-anchor="middle" id="grain-inset-meta"></text>
-    </g>
   </svg>`;
 }
