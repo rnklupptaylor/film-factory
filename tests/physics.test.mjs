@@ -38,6 +38,20 @@ test('target current, pulse duty, and reactive poisoning affect yield and rate',
   assert.ok(check('rf').gross > 0);
 });
 
+test('industrial ITO recipes distinguish conductive oxide and reactive metal targets', () => {
+  const ceramic = check('itoCeramic', { oxygen: 0 });
+  assert.equal(ceramic.film, MATERIALS.ITO);
+  assert.ok(Math.abs(ceramic.net - 20 / 60) < 1e-12);
+  const metal = check('itoReactive', { oxygen: 0 });
+  const transition = check('itoReactive', { oxygen: 5 });
+  const oxide = check('itoReactive');
+  assert.equal(metal.film, MATERIALS.InSn);
+  assert.equal(transition.film, MATERIALS.InSnOx);
+  assert.equal(oxide.film, MATERIALS.ITO);
+  assert.ok(metal.net > transition.net && transition.net > oxide.net);
+  assert.equal(check('arc').film, MATERIALS.TiN);
+});
+
 test('ion bombardment can overcome growth and removes existing film without negative thickness', () => {
   const coating = check('classic', { ionCurrent: 0 });
   const etch = check('classic', { ionCurrent: 1, bias: 3000 });

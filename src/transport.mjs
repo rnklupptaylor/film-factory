@@ -2,7 +2,8 @@ import { CHAMBER, sourceLevel } from './chamber.mjs';
 import { processGas } from './instruments.mjs';
 
 const TRACER_LIMIT = 190;
-const ARGON_MASS = 39.95, NITROGEN_MASS = 28.01;
+const ARGON_MASS = 39.95;
+const GAS_TRACERS = { Ar: ['gas-argon', ARGON_MASS, '#a9ebad'], 'N₂': ['nitrogen', 28.01, '#f5cb91'], 'O₂': ['oxygen', 32, '#ffb2b9'] };
 const TAU = 2 * Math.PI;
 const uniform = (random, min, max) => min + random() * (max - min);
 const opticalDepth = (random) => -Math.log(Math.max(1e-8, 1 - random()));
@@ -74,8 +75,15 @@ function neutralStep(particle, dt, meanPath, sourceY, random) {
 
 function guidedStep(particle, dt) {
   particle.u = Math.min(1, particle.u + dt / particle.duration);
-  const { u, from, to, through } = particle;
-  if (through) {
+  const { u, from, to, through, waypoints } = particle;
+  if (waypoints) {
+    const position = u * (waypoints.length - 1);
+    const index = Math.min(waypoints.length - 2, Math.floor(position));
+    const [x,y] = waypoints[index];
+    const [nextX,nextY] = waypoints[index + 1];
+    particle.x = x + (nextX - x) * (position - index);
+    particle.y = y + (nextY - y) * (position - index);
+  } else if (through) {
     const inv = 1 - u;
     particle.x = inv ** 2 * from[0] + 2 * u * inv * through[0] + u ** 2 * to[0];
     particle.y = inv ** 2 * from[1] + 2 * u * inv * through[1] + u ** 2 * to[1];
@@ -120,11 +128,32 @@ export class ChamberTransport {
     });
   }
 
-  guide(kind, from, to, duration, destination, { through, beam } = {}) {
+  guide(kind, from, to, duration, destination, { through, beam, waypoints } = {}) {
     if (this.particles.length >= TRACER_LIMIT) return;
     this.particles.push({
-      kind, from, to, x: from[0], y: from[1], duration, destination, through, beam, u: 0,
+      kind, from, to, x: from[0], y: from[1], duration, destination, through, beam, waypoints, u: 0,
       trail: [], age: 0, sinceTrail: 0,
+    });
+  }
+
+  highlightCollectedVapour(dt, config, sample, sourceY) {
+    // At collisional pressures most displayed flights disperse. Sample a
+    // small number of trajectories conditioned on collection at the substrate.
+    const rate = 19 * sample.gross / (.14 + sample.gross);
+    const random = this.random;
+    this.produce('collector', rate, dt, () => {
+      const from = [uniform(random, 252, 348), sourceY - 2];
+      const to = [uniform(random, 212, 388), CHAMBER.plateY];
+      const segments = config.classic ? 6 : 1;
+      const waypoints = [from];
+      for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const x = from[0] + (to[0] - from[0]) * t + uniform(random, -28, 28);
+        const y = from[1] + (to[1] - from[1]) * t + uniform(random, -11, 11);
+        waypoints.push([x, y]);
+      }
+      waypoints.push(to);
+      this.guide('atom', from, to, uniform(random, .80, 1.28), 'deposit', { waypoints });
     });
   }
 
@@ -159,6 +188,7 @@ export class ChamberTransport {
       const speed = Math.min(420, thermalSpeed * (.41 + .66 * Math.sqrt(opticalDepth(random))));
       this.emit('atom', 300 + uniform(random, -width, width), sourceY - 1, speed, -1, mass);
     });
+    if (config.classic || config.ibad) this.highlightCollectedVapour(dt, config, sample, sourceY);
     if (method === 'ebeam') {
       this.produce('electron', 36, dt, () => {
         this.guide('electron', [399, sourceY + 19], [306, sourceY - 1], uniform(random, .25, .31), 'hearth',
@@ -169,7 +199,7 @@ export class ChamberTransport {
       this.produce('arc', count * .70, dt, () => {
         const spot = 300 + 53 * Math.sin(2.4 * this.clock) + uniform(random, -9, 9);
         const landing = [spot + uniform(random, -43, 43), CHAMBER.plateY + 1];
-        this.guide('metal-ion', [spot, sourceY - 1], landing, uniform(random, .31, .62), 'substrate');
+        this.guide('metal-ion', [spot, sourceY - 1], landing, uniform(random, .50, .79), 'substrate');
       });
     } else if (config.classic || config.ibad) {
       const ionRate = 85 * Math.min(1, 2.8 * settings.ionCurrent);
@@ -220,11 +250,13 @@ export class ChamberTransport {
     this.gasBudget += count * dt;
     while (this.gasBudget >= 1) {
       this.gasBudget--;
-      const nitrogen = this.random() < gas.nitrogen;
+      const [first, second] = gas.species;
+      const [name] = second && this.random() >= first[1] ? second : first;
+      const [kind, mass, colour] = GAS_TRACERS[name];
       const direction = (gas.gun ? -.48 : 0) + uniform(this.random, -.39, .39);
       const speed = uniform(this.random, 82, 166);
       this.gasParticles.push({
-        kind: nitrogen ? 'nitrogen' : 'gas-argon', mass: nitrogen ? NITROGEN_MASS : ARGON_MASS,
+        kind, mass, colour,
         x: gas.gun ? 191 : CHAMBER.inletX, y: (gas.gun ? 254 : CHAMBER.inletY) + uniform(this.random, -2.6, 2.6),
         vx: speed * Math.cos(direction), vy: speed * Math.sin(direction),
         depth: .60 + opticalDepth(this.random), age: 0,
@@ -285,12 +317,13 @@ export class ChamberTransport {
   draw(ctx) {
     ctx.clearRect(0, 0, CHAMBER.width, CHAMBER.height);
     for (const particle of this.gasParticles) {
-      const { x, y, age, kind } = particle;
+      const { x, y, age, kind, colour } = particle;
+      const molecule = kind !== 'gas-argon';
       ctx.globalAlpha = .85 * Math.min(1, (1.65 - age) * 2.4) * Math.min(1, this.fill * 2.2);
-      ctx.fillStyle = kind === 'nitrogen' ? '#f5cb91' : '#a9ebad';
+      ctx.fillStyle = colour;
       ctx.beginPath();
-      ctx.arc(x, y, kind === 'nitrogen' ? 1.38 : 1.75, 0, TAU);
-      if (kind === 'nitrogen') {
+      ctx.arc(x, y, molecule ? 1.38 : 1.75, 0, TAU);
+      if (molecule) {
         ctx.moveTo(x + 3.6, y + .7);
         ctx.arc(x + 2.2, y + .7, 1.38, 0, TAU);
       }
@@ -299,12 +332,13 @@ export class ChamberTransport {
     const shades = { atom: '#8ccaff', argon: '#d9acff', 'metal-ion': '#7ee7f4', removed: '#ff9c6e', electron: '#ffd08a' };
     const fading = Math.max(0, 1 - this.darkTime / .85);
     for (const particle of this.particles) {
-      const { x, y, kind, trail } = particle;
+      const { x, y, kind, trail, waypoints } = particle;
       const charged = kind === 'argon' || kind === 'metal-ion';
-      ctx.strokeStyle = ctx.fillStyle = shades[kind];
-      ctx.lineWidth = charged ? 1.5 : 1.15;
+      const collected = Boolean(waypoints) || kind === 'metal-ion';
+      ctx.strokeStyle = ctx.fillStyle = waypoints ? '#a9e3ff' : shades[kind];
+      ctx.lineWidth = collected ? 2 : charged ? 1.5 : 1.15;
       if (trail.length) {
-        ctx.globalAlpha = .23 * fading;
+        ctx.globalAlpha = (collected ? .57 : .23) * fading;
         ctx.beginPath();
         ctx.moveTo(...trail[0]);
         for (const point of trail.slice(1)) ctx.lineTo(...point);
@@ -313,7 +347,7 @@ export class ChamberTransport {
       }
       ctx.globalAlpha = .94 * fading;
       ctx.beginPath();
-      ctx.arc(x, y, charged ? 3.9 : 2.45, 0, TAU);
+      ctx.arc(x, y, waypoints ? 3.1 : charged ? 3.9 : 2.45, 0, TAU);
       if (charged) {
         ctx.stroke();
         ctx.beginPath();

@@ -9,7 +9,7 @@ import { FilmMicroscope, paintGrainMap } from './microscope.mjs';
 
 const el = (id) => document.getElementById(id);
 const option = (value, label) => `<option value="${value}">${label}</option>`;
-const displaySymbol = (s) => s === 'SiO2' ? 'SiO₂' : s;
+const displaySymbol = (s) => MATERIALS[s].formula ?? s;
 const number = (value, digits = 2) => Number(value.toFixed(digits)).toString().replace('-', '−');
 const rateNumber = (value) => value !== 0 && Math.abs(value) < .01 ? sci(value) : number(value);
 const waferCentre = (film) => film[(film.length - 1) / 2];
@@ -77,7 +77,7 @@ function chooseVariant(next) {
   variant = next;
   config = VARIANTS[variant];
   settings = newSettings(variant);
-  settings.wafer = wafer;
+  settings.wafer = config.wafer ?? wafer;
   material = MATERIALS[settings.symbol];
   controlPage = 0;
   transport.clear();
@@ -126,7 +126,11 @@ function controlValue(key, value, unit) {
 function renderControls() {
   const technique = TECHNIQUES[family];
   el('question').textContent = technique.question;
-  el('summary').textContent = isPreclean() ? 'Ar⁺ bombards the negatively biased substrate with the evaporation source switched off.' : technique.summary;
+  el('summary').textContent = isPreclean() ? 'Ar⁺ bombards the negatively biased substrate with the evaporation source switched off.'
+    : config.arc ? 'Ti vapour and ions leave the cathode. Nitrogen supplies the N in the TiN coating.'
+    : config.ito === 'alloy' ? 'Argon ions eject In and Sn. Oxygen supplies the oxide in the growing ITO film.'
+    : config.ito ? 'Argon ions sputter a conductive indium tin oxide ceramic target. A small oxygen addition is optional.'
+    : technique.summary;
   pressed(el('techniques'), 'technique', family);
   el('variant').innerHTML = technique.options.map((id) => option(id, VARIANTS[id].name)).join('');
   el('variant').value = variant;
@@ -147,7 +151,7 @@ function renderControls() {
 
 function renderSliders() {
   const groups = controlGroups(config, material);
-  const thirdGroup = config.family === 'plating' ? 'Geometry' : config.duty ? 'Film & pulses' : config.reactive ? 'Film & gas' : 'Film';
+  const thirdGroup = config.family === 'plating' ? 'Geometry' : config.ito || config.reactive ? 'Film & gas' : config.duty ? 'Film & pulses' : 'Film';
   const names = ['Source', 'Chamber', thirdGroup];
   el('control-pages').innerHTML = groups.map((_, i) => `<button type="button" data-group="${i}" aria-pressed="${i === controlPage}">${names[i]}</button>`).join('');
   const controls = groups[controlPage];
@@ -172,7 +176,7 @@ function setupChamber() {
   chamber = {
     svg: art.firstElementChild, ctx, power: el('chamber-power'),
     pressure: el('chamber-pressure'), gauge: el('chamber-gauge-type'), bias: el('chamber-bias'),
-    film: el('in-chamber-film'), residue: el('surface-residue'), heat: art.querySelectorAll('.heat-active'),
+    film: el('in-chamber-film'), filmLabel: el('in-chamber-film-label'), residue: el('surface-residue'), heat: art.querySelectorAll('.heat-active'),
     plasma: el('plasma-glow'), beam: el('electron-guide'),
     coil: el('holder-coil'), valve: el('gas-valve-state'), lamp: el('gas-valve-lamp'),
     species: el('gas-species'), gunFeed: el('gun-gas-path'),
@@ -180,7 +184,7 @@ function setupChamber() {
   };
   const hasIons = family !== 'evaporation';
   const ionText = config.arc ? 'Ti ions' : 'Ar⁺';
-  el('legend').innerHTML = (isPreclean() ? '' : '<span><i class="atom"></i> Neutral vapour</span>')
+  el('legend').innerHTML = (isPreclean() ? '' : `<span><i class="atom"></i> ${config.arc ? 'Ti vapour' : 'Neutral vapour'}</span>`)
     + (hasIons ? `<span><i class="ion${config.arc ? ' metal-ion' : ''}">+</i> ${ionText}</span>` : '')
     + (variant === 'ebeam' ? '<span><i class="electron"></i> Electrons</span>' : '')
     + (family === 'plating' ? `<span><i class="removed"></i> ${isPreclean() ? 'Material removed' : 'Resputtered atoms'}</span>` : '')
@@ -193,10 +197,9 @@ function renderChamber() {
   chamber.feed = processGas(config, settings);
   if (chamber.feed) {
     chamber.species.textContent = chamber.feed.label;
-    const gasLegend = [];
-    if (chamber.feed.nitrogen < 1) gasLegend.push('<span><i class="gas-argon"></i> Ar gas</span>');
-    if (chamber.feed.nitrogen > 0) gasLegend.push('<span><i class="gas-nitrogen"></i> N₂ gas</span>');
-    el('gas-legend').innerHTML = gasLegend.join('');
+    const swatches = { Ar: 'gas-argon', 'N₂': 'gas-nitrogen', 'O₂': 'gas-oxygen' };
+    el('gas-legend').innerHTML = chamber.feed.species.filter(([,fraction]) => fraction > 0)
+      .map(([name]) => `<span><i class="${swatches[name]}"></i> ${name} gas</span>`).join('');
   }
   if (chamber.bias) chamber.bias.textContent = `${settings.bias ? '−' : ''}${settings.bias} V`;
   drawChamberSurface();
@@ -229,6 +232,7 @@ function drawChamberSurface() {
   const h = waferCentre(thickness);
   const height = Math.min(19, 3 * Math.log1p(h));
   chamber.film.setAttribute('height', height);
+  chamber.filmLabel?.setAttribute('visibility', h > .01 ? 'visible' : 'hidden');
   chamber.residue?.setAttribute('opacity', residue * Math.max(0, 1 - height / 3.5));
 }
 
@@ -267,7 +271,9 @@ function renderMetrics() {
     ? ['Vapour pressure pᵥ', sci(sample.vapour / 100), 'mbar']
     : family === 'sputtering'
       ? sample.yieldValue === undefined
-        ? ['Tₛ / nominal film', number(settings.substrate, 0), 'K · SiO₂']
+        ? config.ito
+          ? ['Nominal film', sample.film.formula, '']
+          : ['Tₛ / nominal film', number(settings.substrate, 0), 'K · SiO₂']
         : ['Sputtering yield Y', number(sample.yieldValue), 'atoms/ion']
       : ['Substrate ion energy Eᵢ', number(sample.ionEnergy, 0), 'eV'];
   const values = [
@@ -294,8 +300,10 @@ function renderSource() {
     caption = `${phase} · bulk melting temperature Tₘ = ${material.melting} K.`;
   } else if (family === 'sputtering') {
     const points = rows.map(([x, state]) => [x, state.yieldValue ?? state.gross]);
-    graph = { lines: [{ points }], yDomain: [0, points.at(-1)[1] * 1.14], marker: [settings.energy, sample.yieldValue ?? sample.gross] };
-    caption = config.reactive ? `Modelled target coverage by compound ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
+    graph = { lines: [{ points }], yDomain: [0, Math.max(...points.map(([,y]) => y)) * 1.14], marker: [settings[meta.control], sample.yieldValue ?? sample.gross] };
+    caption = config.ito === 'ceramic' ? 'Reference-scale rate. The conductive ceramic supplies indium, tin and oxygen. O₂ affects film properties, which this rate model leaves fixed.'
+      : config.ito === 'alloy' ? `Modelled oxide coverage of the target ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
+      : config.reactive ? `Modelled target coverage by compound ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
       : material.yields ? 'Approximate Ar⁺ yield for normal incidence on the selected metal.' : 'Effective rate model for an insulating silica target at 13.56 MHz.';
   } else if (isPreclean()) {
     const h = waferCentre(thickness);

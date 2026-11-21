@@ -15,8 +15,12 @@ export const MATERIALS = {
   Cr: { name: 'Chromium', mass: 51.996, density: 7150, melting: 2180, vapour: [899,1054,1256,1530], yields: [[22,0],[100,.30],[200,.67],[300,.87],[600,1.3]], colour: '#9eabc7' },
   Cu: { name: 'Copper', mass: 63.546, density: 8960, melting: 1358, vapour: [773,921,1117,1390], yields: [[17,0],[60,.10],[100,.48],[200,1.10],[300,1.59],[600,2.3]], colour: '#e5a678' },
   Ti: { name: 'Titanium', mass: 47.867, density: 4500, melting: 1941, vapour: [1134,1325,1576,1921], yields: [[20,0],[100,.081],[200,.22],[300,.33],[600,.6]], colour: '#aeb8d4' },
-  SiO2: { name: 'Silica', mass: 60.084, density: 2200, colour: '#a3cddd' },
-  TiN: { name: 'Titanium nitride', mass: 61.874, density: 5220, colour: '#e4ba65' },
+  SiO2: { name: 'Silica', formula: 'SiO₂', mass: 60.084, density: 2200, colour: '#a3cddd' },
+  TiN: { name: 'Titanium nitride', formula: 'TiN', mass: 61.874, density: 5220, colour: '#e4ba65' },
+  // The sputtered tracer mass is representative of In-rich metal species.
+  ITO: { name: 'Indium tin oxide', formula: 'ITO', mass: 114.8, density: 7140, colour: '#9ae1cf' },
+  InSn: { name: 'Indium–tin alloy', formula: 'In–Sn', mass: 115.2, density: 7300, colour: '#b2c2d5' },
+  InSnOx: { name: 'Partially oxidised In–Sn', formula: 'In–Sn–O', mass: 115.2, density: 7200, colour: '#9cbbc1' },
 };
 
 function interpolate(points, x) {
@@ -70,7 +74,20 @@ export function rates(config, settings, material) {
     gross = thicknessRate(flux * config.area * geometry * transmission, material);
   } else if (config.family === 'sputtering') {
     const ionCurrent = settings.current * (config.duty ? settings.duty / 100 : 1);
-    if (material.yields) {
+    if (config.ito) {
+      // Reference-scale thickness rate. The current and distance factors
+      // normalise the schematic coater rather than specifying industrial power.
+      const factor = (ionCurrent / (.35 * .70)) * (settings.energy / 360) ** .65
+        * (.085 / gap) ** 2 * transmission / (1 / (1 + .085 / (8 * meanFreePath(10 ** -2.65))));
+      gross = (20 / 60) * factor;
+      if (config.ito === 'alloy') {
+        const oxygenPa = (10 ** pressure * 100) * (settings.oxygen / 100);
+        const uptake = oxygenPa / .013;
+        poisoning = uptake / (uptake + ionCurrent / (.35 * .70));
+        gross *= 1.65 * (1 - .55 * poisoning);
+        film = oxygenPa === 0 ? MATERIALS.InSn : oxygenPa >= .030 ? MATERIALS.ITO : MATERIALS.InSnOx;
+      }
+    } else if (material.yields) {
       yieldValue = sputterYield(material, settings.energy);
     } else {
       gross = .10 * (ionCurrent / .25) * (settings.energy / 350) ** .65 * (.085 / gap) ** 2 * transmission;

@@ -73,6 +73,35 @@ test('sputtering emits neutrals after target impact and IBAD ions start at the i
   assert.ok(ibad.motion.particles.some((p) => p.kind === 'argon' && p.from[0] === CHAMBER.gunX));
 });
 
+test('ion plating displays evaporation and metal-ion paths arriving at the substrate', () => {
+  for (const method of ['classic', 'ibad']) {
+    const { motion, step, settings } = scene(method);
+    step(true, 120);
+    const vapour = motion.particles.find((particle) => particle.waypoints && particle.u > .5);
+    assert.ok(vapour, method);
+    assert.equal(vapour.from[1], sourceLevel(settings.distance) - 2);
+    assert.equal(vapour.to[1], CHAMBER.plateY);
+    assert.ok(motion.impacts.some(({ kind }) => kind === 'deposit'), method);
+  }
+  const arc = scene('arc');
+  arc.step(true, 120);
+  assert.ok(arc.motion.particles.some((particle) => particle.kind === 'metal-ion' && particle.u > .5));
+  assert.ok(arc.motion.particles.some((particle) => particle.kind === 'atom'));
+  const diagram = chamberMarkup(arc.config, 'arc', arc.settings, arc.material, arc.sample.film);
+  assert.match(diagram, />TiN film</);
+  assert.match(diagram, />N₂</);
+});
+
+test('reactive ITO shows distinct argon and oxygen feed tracers', () => {
+  const sputter = scene('itoReactive');
+  sputter.step(true, 150);
+  assert.ok(sputter.motion.gasParticles.some(({ kind }) => kind === 'oxygen'));
+  assert.ok(sputter.motion.gasParticles.some(({ kind }) => kind === 'gas-argon'));
+  const diagram = chamberMarkup(sputter.config, 'itoReactive', sputter.settings, sputter.material, sputter.sample.film);
+  assert.match(diagram, />Ar \+ O₂</);
+  assert.match(diagram, />ITO film</);
+});
+
 test('every coater starts dark, glows in the appropriate mode, then clears and goes fully dark', () => {
   for (const [method, config] of Object.entries(VARIANTS)) {
     const { motion, step } = scene(method);

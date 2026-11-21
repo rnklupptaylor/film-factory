@@ -33,20 +33,17 @@ export function gasReadings(config, settings, total = 10 ** settings.pressure) {
   const gas = processGas(config, settings);
   if (!gas) return { total, gases: [] };
   if (gas.gun) return { total, gases: [], localGas: 'Argon is metered directly into the ion gun.' };
-  const process = total - chamberPressure(settings, gas, 0);
-  const nitrogen = Math.max(0, process) * gas.nitrogen;
-  const argon = Math.max(0, process) * (1 - gas.nitrogen);
-  const gases = config.arc ? [['N₂', nitrogen]] : [['Ar', argon]];
-  if (config.reactive) gases.push(['N₂', nitrogen]);
-  return { total, gases };
+  const pressure = Math.max(0, total - chamberPressure(settings, gas, 0));
+  return { total, gases: gas.species.map(([name, fraction]) => [name, fraction * pressure]) };
 }
 
 export function processGas(config, settings) {
   if (config.family === 'evaporation') return null;
-  if (config.ibad) return { gun: true, label: 'Ar to gun', nitrogen: 0 };
-  if (config.arc) return { gun: false, label: 'N₂', nitrogen: 1 };
-  const nitrogen = config.reactive ? settings.nitrogen / 100 : 0;
-  return { gun: false, label: nitrogen ? 'Ar + N₂' : 'Ar', nitrogen };
+  if (config.ibad) return { gun: true, label: 'Ar to gun', species: [['Ar', 1]] };
+  if (config.arc) return { gun: false, label: 'N₂', species: [['N₂', 1]] };
+  const reactive = config.reactive ? ['N₂', settings.nitrogen / 100] : config.ito ? ['O₂', settings.oxygen / 100] : null;
+  const species = reactive ? [['Ar', 1 - reactive[1]], reactive] : [['Ar', 1]];
+  return { gun: false, label: species.filter(([, fraction]) => fraction > 0).map(([name]) => name).join(' + '), species };
 }
 
 export function chamberPressure(settings, gas, fill) {

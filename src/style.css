@@ -204,6 +204,7 @@ select {
 .legend .removed { background: #ec8d66; }
 .legend .gas-argon { background: #75b17e; }
 .legend .gas-nitrogen { border-radius: 50%; width: .66rem; background: radial-gradient(circle at 30%, #c78d4f 38%, transparent 42%), radial-gradient(circle at 70%, #c78d4f 38%, transparent 42%); }
+.legend .gas-oxygen { width: .66rem; background: radial-gradient(circle at 30%, #da8090 38%, transparent 42%), radial-gradient(circle at 70%, #da8090 38%, transparent 42%); }
 #gas-legend { display: contents; }
 .chamber-footer { display: flex; align-items: center; justify-content: center; gap: .35rem; min-width: 0; }
 #enlarge-chamber { display: none; }
