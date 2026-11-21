@@ -157,11 +157,31 @@ select {
 .chamber-art, .graphic { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; border-radius: 8px; }
 .chamber-art { background: #162944; }
 .chamber-art svg, .graphic svg { display: block; width: 100%; height: 100%; }
+#chamber-motion { display: block; width: 100%; height: 100%; }
+.chamber-label { fill: #d3e2f5; font: 16px system-ui, sans-serif; }
+.chamber-label.minor { font-size: 13px; }
+.gas-label, .electrode-label { fill: #dec2fc; font: 14px system-ui, sans-serif; }
+.ground-wire, .voltage-wire, .heat-wire, .feedthrough path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ground-wire { stroke: #91b6d2; }
+.voltage-wire { stroke: #c5a5ef; }
+.heat-wire { stroke: #e8ab77; }
+.feedthrough rect { fill: #1d344c; stroke: #a4c4e7; }
+.feedthrough path { stroke: #a4c4e7; }
+.magnetic-field { fill: none; stroke: #b7a0e3; stroke-opacity: .48; stroke-width: 1.5; stroke-dasharray: 4 5; }
+.supply, .terminal { fill: #dfc5ff; stroke: #a58ac9; }
+.supply.heat { fill: #ffcd9d; stroke: #d49f72; }
+.supply rect, .terminal circle { fill: #1b2d49; }
+.supply text { stroke: none; font: 14px system-ui, sans-serif; }
+.supply .supply-title { font-weight: 690; }
+.terminal text { fill: #ead9ff; stroke: none; font: 18px system-ui, sans-serif; }
 .legend { display: flex; gap: .75rem; align-items: center; justify-content: center; flex-wrap: wrap; color: var(--muted); font-size: .8rem; }
 .legend span { display: inline-flex; align-items: center; gap: .27rem; white-space: nowrap; }
 .legend i { width: .56rem; height: .56rem; display: inline-grid; place-content: center; border-radius: 50%; background: var(--plot); }
 .legend .ion { border: 1px solid #aa72d6; color: #aa72d6; background: transparent; font-size: .73rem; font-style: normal; font-weight: 750; }
+.legend .atom { background: #64a7e8; }
+.legend .metal-ion { color: #228295; border-color: #228295; }
 .legend .electron { background: #d78738; }
+.legend .removed { background: #ec8d66; }
 .chamber-footer { display: flex; align-items: center; justify-content: center; gap: .35rem; min-width: 0; }
 #enlarge-chamber { display: none; }
 .plot-caption { color: var(--muted); font-size: .82rem; min-height: 2.25em; }

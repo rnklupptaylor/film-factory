@@ -13,6 +13,7 @@ Film Factory is a teaching app on thin film processing at FAU Erlangen-Nürnberg
 - **Sputtering** includes DC, pulsed DC, RF at 13.56 MHz and reactive Ti magnetron sputtering. Compare Ar⁺ yields, pressure, duty cycle and nitrogen-induced target poisoning.
 - **Ion plating** includes classic plasma-based plating, arc ion plating of TiN and ion beam assisted deposition. Compare deposition and resputtering at different bias and ion current.
 - **Film and plots** show the growth history and projected thickness, the thickness profile across a 100 mm wafer, the source response and a schematic film cross-section. The 60 s runs play at 5× and preserve the effect of earlier slider changes.
+- **Chamber** shows free flights, collisions and ion impacts with labelled supplies and electrodes. Plasma and hot-source glow fade when a run pauses, resets or finishes. Particle flight, pulse and cooldown times are scaled for viewing.
 
 The in-app Theory pages document the lecture references, the literature and material data, and modelling assumptions. The rates are reduced-order teaching estimates. The morphology drawings illustrate trends.
 

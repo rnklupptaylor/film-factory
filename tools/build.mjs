@@ -4,7 +4,7 @@ const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
 const [page, pkg] = await Promise.all([read('src/index.html'), read('package.json')]);
 const { version, teachingVersion = version } = JSON.parse(pkg);
-const includes = ['style.css', 'physics.mjs', 'content.mjs', 'graphics.mjs', 'app.mjs'];
+const includes = ['style.css', 'physics.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'app.mjs'];
 let html = page.replaceAll('%%VERSION%%', teachingVersion);
 for (const name of includes) {
   const marker = `%%${name.toUpperCase()}%%`;

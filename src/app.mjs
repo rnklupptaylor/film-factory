@@ -1,6 +1,8 @@
 import { MATERIALS, POSITIONS, rates, morphology, advanceFilm } from './physics.mjs';
 import { TECHNIQUES, VARIANTS, RUN_LENGTH, THEORY, controlGroups, newSettings, sourceChart } from './content.mjs';
-import { sci, chamberMarkup, particleMarkup, chartMarkup, growthPlot, profilePlot, sectionMarkup } from './graphics.mjs';
+import { sci, chartMarkup, growthPlot, profilePlot, sectionMarkup } from './graphics.mjs';
+import { chamberMarkup } from './chamber.mjs';
+import { ChamberTransport } from './transport.mjs';
 
 const el = (id) => document.getElementById(id);
 const option = (value, label) => `<option value="${value}">${label}</option>`;
@@ -11,6 +13,7 @@ const waferCentre = (film) => film[(film.length - 1) / 2];
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
 const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
+const transport = new ChamberTransport();
 
 let page = 'home';
 let family = 'evaporation';
@@ -30,6 +33,7 @@ let lastFrame = 0;
 let lastRender = 0;
 let frame = 0;
 let manualTheme = false;
+let chamber;
 
 function route() {
   page = location.hash === '#pvd' ? 'pvd' : 'home';
@@ -57,6 +61,7 @@ function chooseVariant(next) {
   settings = newSettings(variant);
   material = MATERIALS[settings.symbol];
   controlPage = 0;
+  transport.clear();
   resetRun();
   renderControls();
   compute(true);
@@ -105,26 +110,42 @@ function renderSliders() {
 }
 
 function setupChamber() {
-  el('chamber-art').innerHTML = chamberMarkup(config, settings, sample.film);
+  const art = el('chamber-art');
+  art.innerHTML = chamberMarkup(config, variant, settings, material, sample.film);
+  const canvas = el('chamber-motion');
+  const ctx = canvas.getContext('2d');
+  ctx?.scale(2, 2);
+  chamber = {
+    svg: art.firstElementChild, ctx, power: el('chamber-power'),
+    pressure: el('chamber-pressure'), bias: el('chamber-bias'),
+    film: el('in-chamber-film'), heat: art.querySelectorAll('.heat-active'),
+    plasma: el('plasma-glow'), beam: el('electron-guide'),
+  };
   const hasIons = family !== 'evaporation';
-  const ionText = config.arc ? 'Positive ions' : 'Ar⁺';
-  el('legend').innerHTML = '<span><i></i> Coating material</span>'
-    + (hasIons ? `<span><i class="ion">+</i> ${ionText}</span>` : '')
-    + (variant === 'ebeam' ? '<span><i class="electron"></i> Electron beam</span>' : '')
-    + (family === 'plating' ? '<span><i class="electron"></i> Resputtered material</span>' : '');
+  const ionText = config.arc ? 'Ti ions' : 'Ar⁺';
+  el('legend').innerHTML = '<span><i class="atom"></i> Neutral vapour</span>'
+    + (hasIons ? `<span><i class="ion${config.arc ? ' metal-ion' : ''}">+</i> ${ionText}</span>` : '')
+    + (variant === 'ebeam' ? '<span><i class="electron"></i> Electrons</span>' : '')
+    + (family === 'plating' ? '<span><i class="removed"></i> Resputtered atoms</span>' : '');
 }
 
 function renderChamber() {
-  el('chamber-art').firstElementChild.setAttribute('viewBox', compactChamber.matches ? '65 60 510 356' : '0 0 600 474');
-  el('chamber-pressure').textContent = `p = ${sci(10 ** settings.pressure)} mbar`;
-  el('chamber-particles').innerHTML = particleMarkup(config, settings, sample, motionPreference.matches ? 0 : seconds, running);
+  chamber.svg.setAttribute('viewBox', compactChamber.matches ? '5 39 609 422' : '0 0 620 465');
+  chamber.pressure.textContent = `p = ${sci(10 ** settings.pressure)} mbar`;
+  if (chamber.bias) chamber.bias.textContent = `${settings.bias ? '−' : ''}${settings.bias} V`;
   const h = waferCentre(thickness);
-  const film = el('in-chamber-film');
-  film.setAttribute('height', h > 0 ? Math.min(19, 3 * Math.log1p(h)) : 0);
-  const plasma = el('plasma-glow');
-  if (plasma) plasma.setAttribute('opacity', Math.min(1, .34 + .4 * Math.max(0, settings.pressure + 3)));
-  const heater = el('heater-glow');
-  if (heater) heater.setAttribute('opacity', Math.min(1, .35 + .21 * Math.log1p(sample.gross * 9)));
+  chamber.film.setAttribute('height', h > 0 ? Math.min(19, 3 * Math.log1p(h)) : 0);
+  drawChamberMotion();
+}
+
+function drawChamberMotion() {
+  const { plasma, heat, beam } = transport.power;
+  chamber.plasma?.setAttribute('opacity', plasma);
+  chamber.beam?.setAttribute('opacity', beam);
+  chamber.heat.forEach((element) => element.setAttribute('opacity', heat));
+  const powerText = running ? 'Power on' : transport.visible ? 'Power off · fading' : 'Standby';
+  if (chamber.power.textContent !== powerText) chamber.power.textContent = powerText;
+  if (chamber.ctx) transport.draw(chamber.ctx);
 }
 
 function renderMetrics() {
@@ -217,48 +238,57 @@ function setRunLabel(status, buttonText) {
 }
 
 function resetRun() {
-  cancelAnimationFrame(frame);
   running = false;
   seconds = 0;
-  lastFrame = 0;
   lastRender = 0;
   thickness = POSITIONS.map(() => 0);
   history = [[0,0]];
   renderClock();
   setRunLabel('Ready', 'Run');
+  scheduleFrame();
 }
 
 function pause() {
-  cancelAnimationFrame(frame);
   running = false;
-  lastFrame = 0;
-  compute();
+  renderChamber();
   setRunLabel('Paused', 'Resume');
+  scheduleFrame();
 }
 
-function animate(now) {
-  if (!running) return;
-  const elapsed = lastFrame ? Math.min(.25, (now - lastFrame) / 1000) * 5 : 0;
-  lastFrame = now;
-  const dt = Math.min(elapsed, RUN_LENGTH - seconds);
+function trackFilm(elapsed, now) {
+  const dt = Math.min(elapsed * 5, RUN_LENGTH - seconds);
   thickness = advanceFilm(thickness, sample, dt);
   seconds += dt;
   if (seconds - history.at(-1)[0] >= .45) history.push([seconds, waferCentre(thickness)]);
   if (seconds >= RUN_LENGTH) {
     running = false;
     setRunLabel('Complete', 'Run again');
-    renderClock();
     compute();
+    renderClock();
     return;
   }
   if (now - lastRender > 70) {
     lastRender = now;
     renderClock();
-    renderChamber();
+    chamber.film.setAttribute('height', Math.min(19, 3 * Math.log1p(waferCentre(thickness))));
     renderMetrics();
     if (plot !== 'source') renderPlot();
   }
-  frame = requestAnimationFrame(animate);
+}
+
+function animate(now) {
+  frame = 0;
+  const elapsed = lastFrame ? (now - lastFrame) / 1000 : 0;
+  lastFrame = now;
+  if (running) trackFilm(Math.min(.25, elapsed), now);
+  transport.update(Math.min(.05, elapsed), running, config, variant, settings, sample, material.mass, waferCentre(thickness), motionPreference.matches);
+  drawChamberMotion();
+  scheduleFrame();
+}
+
+function scheduleFrame() {
+  if (!frame && (running || transport.visible)) frame = requestAnimationFrame(animate);
+  if (!frame) lastFrame = 0;
 }
 
 function switchRun() {
@@ -266,7 +296,7 @@ function switchRun() {
   if (seconds >= RUN_LENGTH) resetRun();
   running = true;
   setRunLabel('Running · 5×', 'Pause');
-  frame = requestAnimationFrame(animate);
+  scheduleFrame();
 }
 
 function openGuide() {
