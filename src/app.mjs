@@ -3,7 +3,7 @@ import { TECHNIQUES, VARIANTS, RUN_LENGTH, THEORY, controlGroups, newSettings, s
 import { sci, chartMarkup, growthPlot, profilePlot } from './graphics.mjs';
 import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
-import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gasReadings, pressureGauge } from './instruments.mjs';
+import { SUBSTRATES, substrateStatus, crystalReading, crystalFrequencyShift, gasReadings, processGas, chamberPressure, pressureGauge } from './instruments.mjs';
 import { growthConditions } from './microstructure.mjs';
 import { FilmMicroscope } from './microscope.mjs';
 
@@ -29,6 +29,7 @@ let controlPage = 0;
 let plot = 'growth';
 let theoryPage = 0;
 let running = false;
+let gasLeadIn = 0;
 let seconds = 0;
 let thickness = POSITIONS.map(() => 0);
 let history = [[0, 0]];
@@ -36,6 +37,7 @@ let residue = 1;
 let residueHistory = [[0, 100]];
 let lastFrame = 0;
 let lastRender = 0;
+let lastVacuumReadout = 0;
 let frame = 0;
 let manualTheme = false;
 let chamber;
@@ -46,6 +48,8 @@ let qcmMass = 0, qcmThickness = 0, qcmHistory = [[0,0]];
 let growthInput = growthConditions(config, settings, sample);
 let crystalInput = crystalReading(config, settings, sample);
 const isPreclean = () => config.classic && settings.preclean;
+const valveOpen = () => running && chamber.feed != null && (!chamber.feed.gun || settings.ionCurrent > 0);
+const readPressure = () => chamberPressure(settings, chamber.feed, transport.fill);
 
 function route() {
   page = location.hash === '#pvd' ? 'pvd' : 'home';
@@ -170,19 +174,28 @@ function setupChamber() {
     pressure: el('chamber-pressure'), gauge: el('chamber-gauge-type'), bias: el('chamber-bias'),
     film: el('in-chamber-film'), residue: el('surface-residue'), heat: art.querySelectorAll('.heat-active'),
     plasma: el('plasma-glow'), beam: el('electron-guide'),
+    coil: el('holder-coil'), valve: el('gas-valve-state'), lamp: el('gas-valve-lamp'),
+    species: el('gas-species'), gunFeed: el('gun-gas-path'),
   };
   const hasIons = family !== 'evaporation';
   const ionText = config.arc ? 'Ti ions' : 'Ar⁺';
   el('legend').innerHTML = (isPreclean() ? '' : '<span><i class="atom"></i> Neutral vapour</span>')
     + (hasIons ? `<span><i class="ion${config.arc ? ' metal-ion' : ''}">+</i> ${ionText}</span>` : '')
     + (variant === 'ebeam' ? '<span><i class="electron"></i> Electrons</span>' : '')
-    + (family === 'plating' ? `<span><i class="removed"></i> ${isPreclean() ? 'Material removed' : 'Resputtered atoms'}</span>` : '');
+    + (family === 'plating' ? `<span><i class="removed"></i> ${isPreclean() ? 'Material removed' : 'Resputtered atoms'}</span>` : '')
+    + (family === 'evaporation' ? '' : '<span id="gas-legend"></span>');
 }
 
 function renderChamber() {
   chamber.svg.setAttribute('viewBox', compactChamber.matches ? '5 39 609 422' : '0 0 620 465');
-  chamber.pressure.textContent = (10 ** settings.pressure).toExponential(2).replace('-', '−');
-  chamber.gauge.textContent = pressureGauge(settings) === 'Cold-cathode gauge' ? 'Cold cathode' : 'Capacitance';
+  chamber.feed = processGas(config, settings);
+  if (chamber.feed) {
+    chamber.species.textContent = chamber.feed.label;
+    const gasLegend = [];
+    if (chamber.feed.nitrogen < 1) gasLegend.push('<span><i class="gas-argon"></i> Ar gas</span>');
+    if (chamber.feed.nitrogen > 0) gasLegend.push('<span><i class="gas-nitrogen"></i> N₂ gas</span>');
+    el('gas-legend').innerHTML = gasLegend.join('');
+  }
   if (chamber.bias) chamber.bias.textContent = `${settings.bias ? '−' : ''}${settings.bias} V`;
   drawChamberSurface();
   drawChamberMotion();
@@ -196,11 +209,27 @@ function drawChamberSurface() {
 }
 
 function drawChamberMotion() {
-  const { plasma, heat, beam } = transport.power;
+  const { plasma, heat, beam, holder } = transport.power;
   chamber.plasma?.setAttribute('opacity', plasma);
   chamber.beam?.setAttribute('opacity', beam);
   chamber.heat.forEach((element) => element.setAttribute('opacity', heat));
-  const powerText = running ? isPreclean() ? 'Pre-clean · source off' : 'Power on'
+  chamber.coil.setAttribute('opacity', holder);
+  const pressure = readPressure();
+  const digits = sci(pressure, 2);
+  const gauge = pressureGauge(pressure) === 'Cold-cathode gauge' ? 'Cold cathode' : 'Capacitance';
+  if (chamber.pressure.textContent !== digits) chamber.pressure.textContent = digits;
+  if (chamber.gauge.textContent !== gauge) chamber.gauge.textContent = gauge;
+  if (chamber.valve) {
+    const open = valveOpen();
+    const label = open ? 'Open · flowing' : 'Closed';
+    if (chamber.valve.textContent !== label) {
+      chamber.valve.textContent = label;
+      chamber.valve.classList.toggle('open', open);
+      chamber.lamp.classList.toggle('open', open);
+      chamber.gunFeed?.setAttribute('opacity', Number(open));
+    }
+  }
+  const powerText = running ? gasLeadIn ? 'Gas stabilising' : isPreclean() ? 'Pre-clean · source off' : 'Power on'
     : transport.visible ? 'Power off · fading' : 'Standby';
   if (chamber.power.textContent !== powerText) chamber.power.textContent = powerText;
   if (chamber.ctx) transport.draw(chamber.ctx);
@@ -293,7 +322,7 @@ function renderMorphology() {
   el('plot-meta').textContent = `${preview ? '60 s forecast' : 'Accumulated film'}${theta}`;
   el('plot-caption').textContent = substrateStatus(settings).hot
     ? 'Above the substrate thermal reference. The model still assumes an intact substrate.'
-    : `${microscope.gpu ? 'SEM-style contrast. Drag or use arrow keys to rotate.' : 'Surface height map. 3D rendering is unavailable on this device.'} Coarse model.`;
+    : `${microscope.gpu ? 'Drag or use arrow keys to rotate.' : 'Surface height map.'} RMS roughness comes from modelled heights.`;
 }
 
 function instrumentCards(readings) {
@@ -324,22 +353,23 @@ function renderInstruments() {
     return;
   }
   if (sensorMode === 'vacuum') {
-    const readout = gasReadings(config, settings);
+    const readout = gasReadings(config, settings, readPressure());
     el('plot-meta').textContent = 'Chamber & holder';
     body.innerHTML = instrumentCards([
-      [pressureGauge(settings), `${sci(readout.total)} mbar`],
+      [pressureGauge(readout.total), `${sci(readout.total, 2)} mbar`],
       ['Holder thermocouple', `${settings.substrate} K`],
       ...readout.gases.map(([gas, pressure]) => [`RGA · p(${gas})`, pressure ? `${sci(pressure)} mbar` : '0 mbar']),
-    ]) + `<p class="instrument-note">${readout.gases.length ? 'Partial pressures follow the configured gas mix. Process pressures require a differentially pumped RGA inlet.' : readout.localGas ?? 'Residual gas composition is unspecified for this preset.'}</p>`;
-    el('plot-caption').textContent = 'Ideal readouts. The thermocouple is attached to the holder and follows the selected Tₛ.';
+    ]) + `<p class="instrument-note">${readout.gases.length ? 'Partial pressures follow the selected gas mixture as the chamber fills and pumps down. An RGA at process pressure requires differential pumping.' : readout.localGas ?? 'Residual gas composition is unspecified for this preset.'}</p>`;
+    el('plot-caption').textContent = 'Modelled gauge and thermocouple. The holder sensor follows the selected Tₛ.';
     return;
   }
   el('plot-meta').textContent = 'Discharge';
   const readings = [];
-  if (family === 'sputtering') readings.push(['Effective target ion current', `${number(running ? settings.current * (config.duty ? settings.duty / 100 : 1) : 0)} A`]);
-  if (family === 'plating') readings.push(['Substrate ion current density', `${number(running ? settings.ionCurrent : 0)} mA/cm²`]);
-  if (config.reactive) readings.push(['OES · Relative Ti emission', running ? `${number(100 * (1 - .63 * sample.poisoning), 1)}%` : 'Off']);
-  body.innerHTML = instrumentCards(readings) + `<p class="instrument-note">${config.reactive
+  const discharge = running && !gasLeadIn;
+  if (family === 'sputtering') readings.push(['Effective target ion current', `${number(discharge ? settings.current * (config.duty ? settings.duty / 100 : 1) : 0)} A`]);
+  if (family === 'plating') readings.push(['Substrate ion current density', `${number(discharge ? settings.ionCurrent : 0)} mA/cm²`]);
+  if (config.reactive) readings.push(['OES · Relative Ti emission', discharge ? `${number(100 * (1 - .63 * sample.poisoning), 1)}%` : 'Off']);
+    body.innerHTML = instrumentCards(readings) + `<p class="instrument-note">${config.reactive
     ? 'The Ti emission proxy follows the modelled metal yield at fixed discharge conditions.'
     : family === 'evaporation' ? 'The evaporation preset has no plasma discharge.'
       : 'Select reactive Ti sputtering to monitor a modelled optical emission signal.'}</p>`;
@@ -396,6 +426,7 @@ function setRunLabel(status, buttonText) {
 
 function restartTimeline() {
   running = false;
+  gasLeadIn = 0;
   seconds = 0;
   lastRender = 0;
   history = [[0, waferCentre(thickness)]];
@@ -420,6 +451,7 @@ function resetRun() {
 
 function pause() {
   running = false;
+  gasLeadIn = 0;
   compute();
   renderClock();
   setRunLabel('Paused', 'Resume');
@@ -463,7 +495,7 @@ function trackFilm(elapsed, now) {
     renderClock();
     drawChamberSurface();
     renderMetrics();
-    if (plot !== 'source') renderPlot();
+    if (plot !== 'source' && (plot !== 'diagnostics' || sensorMode !== 'vacuum')) renderPlot();
   }
 }
 
@@ -471,8 +503,17 @@ function animate(now) {
   frame = 0;
   const elapsed = lastFrame ? (now - lastFrame) / 1000 : 0;
   lastFrame = now;
-  if (running) trackFilm(Math.min(.25, elapsed), now);
-  transport.update(Math.min(.05, elapsed), running, config, variant, settings, sample, material.mass, waferCentre(thickness), motionPreference.matches, residue);
+  const dt = Math.min(.25, elapsed);
+  if (running && gasLeadIn) {
+    gasLeadIn = Math.max(0, gasLeadIn - dt);
+    if (!gasLeadIn) setRunLabel('Running · 5×', 'Pause');
+  } else if (running) trackFilm(dt, now);
+  transport.update(Math.min(.05, elapsed), running && !gasLeadIn, config, variant, settings, sample,
+    material.mass, waferCentre(thickness), motionPreference.matches, residue, valveOpen());
+  if (plot === 'diagnostics' && sensorMode === 'vacuum' && (now - lastVacuumReadout > 100 || !transport.visible)) {
+    lastVacuumReadout = now;
+    renderInstruments();
+  }
   drawChamberMotion();
   scheduleFrame();
 }
@@ -486,7 +527,8 @@ function switchRun() {
   if (running) { pause(); return; }
   if (seconds >= RUN_LENGTH) resetRun();
   running = true;
-  setRunLabel('Running · 5×', 'Pause');
+  gasLeadIn = valveOpen() ? .65 : 0;
+  setRunLabel(gasLeadIn ? 'Gas stabilising' : 'Running · 5×', 'Pause');
   if (plot === 'diagnostics') renderInstruments();
   scheduleFrame();
 }
@@ -557,7 +599,7 @@ el('sliders').addEventListener('change', (event) => {
   if (event.target.id !== 'wafer') return;
   settings.wafer = event.target.value;
   resetRun();
-  compute();
+  compute(true);
 });
 document.querySelector('.plot-nav').addEventListener('click', (event) => {
   const target = event.target.closest('[data-plot]');

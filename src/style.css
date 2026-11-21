@@ -190,6 +190,9 @@ select {
 .legend .metal-ion { color: #228295; border-color: #228295; }
 .legend .electron { background: #d78738; }
 .legend .removed { background: #ec8d66; }
+.legend .gas-argon { background: #75b17e; }
+.legend .gas-nitrogen { border-radius: 50%; width: .66rem; background: radial-gradient(circle at 30%, #c78d4f 38%, transparent 42%), radial-gradient(circle at 70%, #c78d4f 38%, transparent 42%); }
+#gas-legend { display: contents; }
 .chamber-footer { display: flex; align-items: center; justify-content: center; gap: .35rem; min-width: 0; }
 #enlarge-chamber { display: none; }
 .plot-caption { color: var(--muted); font-size: .82rem; min-height: 2.25em; }
@@ -197,6 +200,12 @@ select {
 .chart text.major { fill: var(--ink); font-weight: 690; }
 .gauge-label, .gauge-unit { fill: #c8d8e6; font: 10px system-ui, sans-serif; }
 .gauge-digits { fill: #9af4cc; font: 690 11px var(--mono); }
+.gas-valve-state, .holder-controller { font: 600 10px system-ui, sans-serif; fill: #c1d4e5; }
+.gas-valve-state.open, #gas-valve-lamp.open { fill: #b7efbd; }
+.holder-controller { fill: #f0c295; }
+.holder-wires { fill: none; stroke: #d7a278; stroke-width: 1.5; }
+.roughness { font-weight: 700; white-space: nowrap; }
+.roughness sub { line-height: 0; }
 .chamber-sensor text { fill: #c9d8e8; font: 690 12px system-ui, sans-serif; }
 .model-view, .sensor-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .45rem; }
 .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .25rem; }

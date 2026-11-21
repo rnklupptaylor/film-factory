@@ -29,18 +29,33 @@ export function crystalFrequencyShift(mass) {
   return -2 * F0 ** 2 * mass / Math.sqrt(QUARTZ_DENSITY * QUARTZ_SHEAR);
 }
 
-export function gasReadings(config, settings) {
-  const total = 10 ** settings.pressure;
-  if (config.reactive) {
-    const nitrogen = total * settings.nitrogen / 100;
-    return { total, gases: [['Ar', total - nitrogen], ['N₂', nitrogen]] };
-  }
-  if (config.arc) return { total, gases: [['N₂', total]] };
-  if (config.family === 'evaporation') return { total, gases: [] };
-  if (config.ibad) return { total, gases: [], localGas: 'Ar is supplied to the ion gun.' };
-  return { total, gases: [['Ar', total]] };
+export function gasReadings(config, settings, total = 10 ** settings.pressure) {
+  const gas = processGas(config, settings);
+  if (!gas) return { total, gases: [] };
+  if (gas.gun) return { total, gases: [], localGas: 'Argon is metered directly into the ion gun.' };
+  const process = total - chamberPressure(settings, gas, 0);
+  const nitrogen = Math.max(0, process) * gas.nitrogen;
+  const argon = Math.max(0, process) * (1 - gas.nitrogen);
+  const gases = config.arc ? [['N₂', nitrogen]] : [['Ar', argon]];
+  if (config.reactive) gases.push(['N₂', nitrogen]);
+  return { total, gases };
 }
 
-export function pressureGauge(settings) {
-  return settings.pressure <= -3.4 ? 'Cold-cathode gauge' : 'Capacitance gauge';
+export function processGas(config, settings) {
+  if (config.family === 'evaporation') return null;
+  if (config.ibad) return { gun: true, label: 'Ar to gun', nitrogen: 0 };
+  if (config.arc) return { gun: false, label: 'N₂', nitrogen: 1 };
+  const nitrogen = config.reactive ? settings.nitrogen / 100 : 0;
+  return { gun: false, label: nitrogen ? 'Ar + N₂' : 'Ar', nitrogen };
+}
+
+export function chamberPressure(settings, gas, fill) {
+  const working = 10 ** settings.pressure;
+  if (!gas || (gas.gun && !settings.ionCurrent)) return working;
+  const base = Math.min(1.3e-6, working);
+  return base + (working - base) * fill;
+}
+
+export function pressureGauge(pressure) {
+  return pressure <= 10 ** -3.4 ? 'Cold-cathode gauge' : 'Capacitance gauge';
 }

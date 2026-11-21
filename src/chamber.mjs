@@ -1,9 +1,12 @@
+import { processGas } from './instruments.mjs';
+
 export const CHAMBER = {
   width: 620, height: 465,
   left: 119, right: 479, top: 81, bottom: 397,
   plateLeft: 202, plateRight: 398, plateY: 135,
   targetLeft: 224, targetRight: 376,
   gunX: 185, gunY: 250,
+  inletX: 149, inletY: 211,
 };
 
 export function sourceLevel(distance) {
@@ -38,8 +41,8 @@ function circuitMarkup(config, method, y, preclean) {
     <text class="chamber-label minor" x="202" y="58">0 V</text>`;
   const bias = `<path class="voltage-wire" d="M300 81V48h196v38h7"/>
     ${supply(503, 47, 'Substrate bias', '− Vₛ', '+ return', 'voltage', 'chamber-bias')}
-    ${terminal(410, 128, '−')}`;
-  const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/><path d="M300 64v54"/></g>`;
+    ${terminal(425, 135, '−')}`;
+  const lid = `<g class="feedthrough"><rect x="287" y="65" width="26" height="17" rx="3"/><path d="M300 64v46"/></g>`;
   const shell = `<path class="ground-wire" d="M105 348H83"/>${earth(83, 348)}
     <text class="chamber-label minor" x="9" y="354">${config.diode ? 'Anode 0 V' : 'Wall 0 V'}</text>`;
   const yBox = 326;
@@ -71,16 +74,51 @@ function circuitMarkup(config, method, y, preclean) {
   return `${biased ? bias : groundedSubstrate}${lid}${shell}${source}${gun}`;
 }
 
-function gasInlet(gasLabel) {
+function gasInlet(gas) {
+  const duct = gas.gun ? '<path d="M130 211h31v28l9 13"/>' : '';
   return `<g class="gas-inlet">
-    <path d="M17 211h118" stroke="#1b2b40" stroke-width="10" stroke-linecap="round"/>
-    <path d="M17 211h118" stroke="#8ba9c0" stroke-width="5" stroke-linecap="round"/>
+    <g fill="none" stroke="#1b2b40" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d="M17 211h118"/>${duct}</g>
+    <g fill="none" stroke="#8ba9c0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 211h118"/>${duct}</g>
+    ${gas.gun ? '<path id="gun-gas-path" d="M130 211h31v28l9 13" fill="none" stroke="#a9ebad" stroke-width="2" opacity="0"/>' : ''}
     <rect x="98" y="200" width="13" height="22" rx="2" fill="#546d86" stroke="#a4bfd4"/>
     <rect x="108" y="203" width="15" height="16" rx="2" fill="#557089" stroke="#abc2d7"/>
-    <path d="M130 205h12l6 3v6l-6 3h-12Z" fill="#68859d" stroke="#a6c2d8"/>
+    ${gas.gun ? '' : '<path d="M130 205h12l6 3v6l-6 3h-12Z" fill="#68859d" stroke="#a6c2d8"/>'}
     <path d="M43 203l19 8-19 8Zm38 0-19 8 19 8Z" fill="#2b5670" stroke="#b2c9db"/>
     <path d="M62 205v-12m-7 0h14" fill="none" stroke="#b2c9db" stroke-width="2" stroke-linecap="round"/>
-    <text class="chamber-label minor" x="14" y="184">${gasLabel}</text>
+    <circle id="gas-valve-lamp" cx="18" cy="181" r="3" fill="#8a9eb4"/>
+    <text class="chamber-label minor" x="26" y="185" id="gas-species">${gas.label}</text>
+    <text class="gas-valve-state" x="14" y="${gas.gun ? 166 : 232}" id="gas-valve-state">Closed</text>
+  </g>`;
+}
+
+const WAFER_VIEW = {
+  silicon: { label: 'Si wafer', height: 7, edge: '#baccf1', stops: ['#909cbc', '#46546f', '#7584aa'], detail: 'M210 130h179' },
+  borofloat: { label: 'Borosilicate glass', height: 10, edge: '#c4e6d9', stops: ['#b2e2d7', '#558f88', '#94c9b9'], detail: 'M205 127h186m-173 6h173' },
+  silica: { label: 'Fused silica', height: 10, edge: '#d8f6ff', stops: ['#bce3f2', '#648eac', '#a8cddf'], detail: 'M206 127h186m-175 6h174' },
+  steel: { label: '304 stainless steel', height: 8, edge: '#e3e7ed', stops: ['#e1e4e6', '#576878', '#a6b0bd'], detail: 'M212 129h181m-175 4h169' },
+  polycarbonate: { label: 'Polycarbonate', height: 9, edge: '#e5e9d8', stops: ['#dce4d0', '#869485', '#b7c8b7'], detail: 'M208 128h182m-164 5h165' },
+  kapton: { label: 'Kapton HN', height: 4, edge: '#ffd084', stops: ['#ffc075', '#ad602b', '#e7aa55'], detail: 'M206 133h182' },
+};
+
+function holderMarkup(wafer) {
+  const y = CHAMBER.plateY - wafer.height;
+  const element = 'M228 115h8l6 3 6-5 6 5 6-5 6 5 6-3h56l6 3 6-5 6 5 6-5 6 5 6-3h8';
+  return `<g class="heated-holder" aria-hidden="true">
+    <rect x="107" y="41" width="84" height="22" rx="5" fill="#322e35" stroke="#9e7d62"/>
+    <text x="113" y="55" class="holder-controller">Holder heat</text>
+    <text x="178" y="55" class="holder-controller">~</text>
+    <rect x="158" y="65" width="29" height="18" rx="3" fill="#36506b" stroke="#9bb6d9"/>
+    <path class="holder-wires" d="M165 63v33h53v20h13M180 63v27h63v20"/>
+    <path d="M300 82v28" fill="none" stroke="#9bb6d9" stroke-width="6" stroke-linecap="round"/>
+    <rect x="189" y="109" width="222" height="19" rx="4" fill="url(#steel)" stroke="#bed0df"/>
+    <path d="M195 113h210M195 124h210" fill="none" stroke="#ddeaf4" stroke-opacity=".28"/>
+    <rect x="226" y="111" width="149" height="10" rx="3" fill="#283142" stroke="#b3a27e"/>
+    <path d="${element}" fill="none" stroke="#a7977e" stroke-width="1.6"/>
+    <path id="holder-coil" d="${element}" fill="none" stroke="#ffc275" stroke-width="2.7" opacity="0"/>
+    <path d="M194 124h17v5h-8v6h-6v-8h-3Zm212 0h-17v5h8v6h6v-8h3Z" fill="#8196ae" stroke="#bccde2"/>
+    <rect x="202" y="${y}" width="196" height="${wafer.height}" rx="1.6" fill="url(#substrate-material)" stroke="${wafer.edge}"/>
+    <path d="${wafer.detail}" fill="none" stroke="${wafer.edge}" opacity=".57"/>
+    <text class="chamber-label" x="317" y="103">${wafer.label}</text>
   </g>`;
 }
 
@@ -96,9 +134,9 @@ function chamberSensors(hasPlasma) {
       <path d="M439 106v46m-12 0h24" stroke="#91b4ca" stroke-width="2" fill="none"/>
       <rect x="428" y="152" width="22" height="8" rx="2" fill="#c6a674" stroke="#f1d398"/>
       <text x="439" y="177" text-anchor="middle">QCM</text>
-      <circle cx="251" cy="118" r="3.6" fill="#edb472"/>
-      <path d="M251 115v-11h-15" stroke="#edb472" fill="none"/>
-      <text x="234" y="108" text-anchor="end">TC</text>
+      <circle cx="282" cy="111" r="3.1" fill="#edb472"/>
+      <path d="M282 109V99h-15" stroke="#edb472" fill="none"/>
+      <text x="264" y="103" text-anchor="end">TC</text>
       ${hasPlasma ? '<path d="M473 181h18v19h-18Z" fill="#535884" stroke="#bdafe4"/><text x="467" y="196" text-anchor="end">OES</text>' : ''}
     </g>
   </g>`;
@@ -154,8 +192,9 @@ function sourceMarkup(config, method, y, colour) {
 
 export function chamberMarkup(config, method, settings, material, film) {
   const y = sourceLevel(settings.distance);
-  const gas = config.family === 'sputtering' || config.classic || config.arc;
-  const gasLabel = config.arc ? 'N₂' : config.reactive ? 'Ar + N₂' : 'Ar';
+  const gas = processGas(config, settings);
+  const hasPlasma = gas && !gas.gun;
+  const wafer = WAFER_VIEW[settings.wafer] ?? WAFER_VIEW.silicon;
   const plasmaY = config.classic ? 175 : config.diode ? y - 99 : y - 52;
   const preclean = config.classic && settings.preclean;
   const substrate = config.classic || config.arc ? 'Negatively biased substrate' : 'Substrate holder at ground';
@@ -164,12 +203,13 @@ export function chamberMarkup(config, method, settings, material, film) {
     : config.arc || config.family === 'sputtering' ? 'Negative cathode with a grounded positive return'
     : config.ibad ? 'DC heater and ion gun with positive source and grounded extraction grid' : 'DC heater with positive and negative leads';
   const field = config.magnetron ? ' Permanent magnets and magnetic field B.' : '';
-  return `<svg viewBox="0 0 620 465" role="img" aria-label="${config.hardware}. ${substrate}. ${supply}.${field}${preclean ? ' The heater is off for plasma pre-cleaning.' : ''}">
+  return `<svg viewBox="0 0 620 465" role="img" aria-label="${config.hardware}. ${wafer.label} on a holder with an independent resistance heater. ${substrate}. ${supply}.${field}${preclean ? ' The evaporation source heater is off for plasma pre-cleaning.' : ''}">
     <defs>
       <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" stroke="#718aa9" stroke-opacity=".20"/></pattern>
       <radialGradient id="plasma"><stop stop-color="#b997ff" stop-opacity=".68"/><stop offset="1" stop-color="#9d6dec" stop-opacity="0"/></radialGradient>
       <radialGradient id="heat"><stop stop-color="#ffbe67" stop-opacity=".68"/><stop offset="1" stop-color="#ed783d" stop-opacity="0"/></radialGradient>
       <linearGradient id="steel" x2="0" y2="1"><stop stop-color="#a8bed6"/><stop offset="1" stop-color="#4f6b8c"/></linearGradient>
+      <linearGradient id="substrate-material" x2="0" y2="1">${wafer.stops.map((colour, index) => `<stop offset="${[0,.62,1][index]}" stop-color="${colour}"/>`).join('')}</linearGradient>
       <clipPath id="chamber-interior"><rect x="119" y="81" width="360" height="316" rx="27"/></clipPath>
     </defs>
     <rect width="620" height="465" fill="#14253d"/>
@@ -180,19 +220,17 @@ export function chamberMarkup(config, method, settings, material, film) {
     <rect x="106" y="68" width="386" height="342" rx="37" fill="#314b68" stroke="#94afd1" stroke-width="2"/>
     <rect x="119" y="81" width="360" height="316" rx="27" fill="#122137" stroke="#6b8aac" stroke-width="2"/>
     <g clip-path="url(#chamber-interior)">
-      ${gas ? `<g id="plasma-glow" fill="url(#plasma)" opacity="0">${config.magnetron
+      ${hasPlasma ? `<g id="plasma-glow" fill="url(#plasma)" opacity="0">${config.magnetron
         ? `<ellipse cx="263" cy="${y - 25}" rx="70" ry="38"/><ellipse cx="337" cy="${y - 25}" rx="70" ry="38"/>`
         : `<ellipse cx="300" cy="${plasmaY}" rx="${config.diode ? 181 : config.arc ? 115 : 149}" ry="${config.diode ? 120 : config.classic ? 100 : 63}"/>`}</g>` : ''}
       ${config.family !== 'sputtering' && !config.arc ? `<ellipse class="heat-active" cx="300" cy="${y + (method === 'radiant' ? 17 : 1)}" rx="96" ry="45" fill="url(#heat)" opacity="0"/>` : ''}
     </g>
+    ${holderMarkup(wafer)}
     ${circuitMarkup(config, method, y, preclean)}
-    <path d="M300 82v35m-106 0h212" fill="none" stroke="#9bb6d9" stroke-width="5" stroke-linecap="round"/>
-    <rect x="202" y="121" width="196" height="14" rx="3" fill="url(#steel)" stroke="#becde0"/>
     ${config.classic ? '<path id="surface-residue" d="M203 137h194" stroke="#f4b280" stroke-width="3.5" stroke-dasharray="2 3" stroke-linecap="round"/>' : ''}
     <rect id="in-chamber-film" x="202" y="135" width="196" height="0" rx="2" fill="${film.colour}"/>
-    <text class="chamber-label" x="320" y="104">Substrate</text>
-    ${chamberSensors(gas)}
-    ${gas ? gasInlet(gasLabel) : ''}
+    ${chamberSensors(hasPlasma)}
+    ${gas ? gasInlet(gas) : ''}
     ${sourceMarkup(config, method, y, material.colour)}
     ${config.ibad ? '<path d="m144 265 37-21 13 24-37 21Z" fill="#6c829f" stroke="#c2ace3"/><path d="m179 245 14 24" stroke="#c2ace3" stroke-width="2"/>' : ''}
     <foreignObject x="0" y="0" width="620" height="465" clip-path="url(#chamber-interior)" pointer-events="none">

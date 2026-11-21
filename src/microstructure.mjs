@@ -151,6 +151,12 @@ class DepositLattice {
   }
 }
 
+export function arealRmsHeight(heights, cellHeight) {
+  const mean = heights.reduce((sum, height) => sum + height, 0) / heights.length;
+  const variance = heights.reduce((sum, height) => sum + (height - mean) ** 2, 0) / heights.length;
+  return Math.sqrt(variance) * cellHeight;
+}
+
 export function simulateMorphology(segments, reference = 0, size = 40) {
   const good = segments.filter((part) => part.duration > 0 && (part.gross > 0 || part.loss > 0));
   const arriving = good.reduce((sum, part) => sum + part.duration * part.gross, 0);
@@ -188,10 +194,9 @@ export function simulateMorphology(segments, reference = 0, size = 40) {
   const envelope = lattice.tops.reduce((sum,h) => sum + h, 0);
   const covered = lattice.tops.reduce((sum,h) => sum + Number(h > 0), 0);
   const highest = lattice.tops.reduce((max,h) => Math.max(max,h), 0);
-  const mean = envelope / lattice.area;
-  const rms = Math.sqrt(lattice.tops.reduce((sum,h) => sum + (h - mean) ** 2, 0) / lattice.area);
   return { size, resolution, highest, voxels: lattice.voxels, tops: lattice.tops,
-    count: lattice.count, coverage: covered / lattice.area, voidFraction: envelope ? 1 - lattice.count / envelope : 0, rms };
+    count: lattice.count, coverage: covered / lattice.area, voidFraction: envelope ? 1 - lattice.count / envelope : 0,
+    roughnessNm: arealRmsHeight(lattice.tops, resolution) };
 }
 
 // Surface nets extracts the interface of the 3D occupancy field. One vertex

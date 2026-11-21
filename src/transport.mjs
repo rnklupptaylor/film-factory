@@ -1,7 +1,8 @@
 import { CHAMBER, sourceLevel } from './chamber.mjs';
+import { processGas } from './instruments.mjs';
 
 const TRACER_LIMIT = 190;
-const ARGON_MASS = 39.95;
+const ARGON_MASS = 39.95, NITROGEN_MASS = 28.01;
 const TAU = 2 * Math.PI;
 const uniform = (random, min, max) => min + random() * (max - min);
 const opticalDepth = (random) => -Math.log(Math.max(1e-8, 1 - random()));
@@ -66,7 +67,7 @@ function neutralStep(particle, dt, meanPath, sourceY, random) {
       return '';
     }
     scatter(particle, random);
-    particle.trail.push([particle.x, particle.y]);
+    particle.trail?.push([particle.x, particle.y]);
   }
   return '';
 }
@@ -96,14 +97,18 @@ export class ChamberTransport {
   clear() {
     this.particles = [];
     this.impacts = [];
+    this.gasParticles = [];
+    this.gasBudget = 0;
+    this.fill = 0;
     this.budgets = {};
     this.clock = 0;
     this.darkTime = 1;
-    this.power = { plasma: 0, heat: 0, beam: 0 };
+    this.power = { plasma: 0, heat: 0, beam: 0, holder: 0 };
   }
 
   get visible() {
-    return this.particles.length > 0 || this.impacts.length > 0 || Object.values(this.power).some((power) => power > 0);
+    return this.particles.length > 0 || this.impacts.length > 0 || this.gasParticles.length > 0
+      || this.fill > 0 || Object.values(this.power).some((power) => power > 0);
   }
 
   emit(kind, x, y, speed, direction, mass) {
@@ -196,18 +201,53 @@ export class ChamberTransport {
     }
   }
 
-  update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion, residue = 0) {
+  updateGas(dt, open, gas, settings, sample, reducedMotion) {
+    const target = Number(open);
+    const fill = target + (this.fill - target) * Math.exp(-dt / (open ? .12 : .20));
+    this.fill = reducedMotion ? target : fill < .0005 ? 0 : fill;
+    if (reducedMotion) { this.gasParticles = []; this.gasBudget = 0; return; }
+    if (!gas || !this.fill) { this.gasParticles = []; this.gasBudget = 0; return; }
+    const sourceY = sourceLevel(settings.distance);
+    const meanPath = displayFreePath(sample.lambda, settings.distance);
+    this.gasParticles = this.gasParticles.filter((particle) => {
+      particle.age += dt;
+      return particle.age < 1.65 && !neutralStep(particle, dt, meanPath, sourceY, this.random);
+    });
+    if (!open) { this.gasBudget = 0; return; }
+    // Sparse tracer count is for legibility. The simulator does not infer a
+    // mass flow from pressure because pump speed and conductance are unspecified.
+    const count = gas.gun ? 30 : Math.min(87, 48 + 14 * Math.max(0, settings.pressure + 3));
+    this.gasBudget += count * dt;
+    while (this.gasBudget >= 1) {
+      this.gasBudget--;
+      const nitrogen = this.random() < gas.nitrogen;
+      const direction = (gas.gun ? -.48 : 0) + uniform(this.random, -.39, .39);
+      const speed = uniform(this.random, 82, 166);
+      this.gasParticles.push({
+        kind: nitrogen ? 'nitrogen' : 'gas-argon', mass: nitrogen ? NITROGEN_MASS : ARGON_MASS,
+        x: gas.gun ? 191 : CHAMBER.inletX, y: (gas.gun ? 254 : CHAMBER.inletY) + uniform(this.random, -2.6, 2.6),
+        vx: speed * Math.cos(direction), vy: speed * Math.sin(direction),
+        depth: .60 + opticalDepth(this.random), age: 0,
+      });
+    }
+  }
+
+  update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion, residue = 0, gasOpen = active) {
     this.clock += dt;
     this.darkTime = active ? 0 : this.darkTime + dt;
     const pulse = !config.duty || (this.clock % .62) / .62 < settings.duty / 100;
     const hasPlasma = config.family === 'sputtering' || config.classic || config.arc;
     const hasHeater = config.family !== 'sputtering' && !config.arc && !settings.preclean;
+    const gas = processGas(config, settings);
+    const flowing = gasOpen && gas != null && (!gas.gun || settings.ionCurrent > 0);
+    this.updateGas(dt, flowing, gas, settings, sample, reducedMotion);
     const targets = {
       plasma: active && hasPlasma && (reducedMotion || pulse) ? .56 + .4 * Math.min(1, (settings.current ?? settings.ionCurrent + .35)) : 0,
       heat: active && hasHeater ? Math.min(1, .53 + .22 * Math.log1p(sample.gross * 5)) : 0,
       beam: active && method === 'ebeam' ? .9 : 0,
+      holder: active || flowing ? .95 * -Math.expm1(-Math.max(0, settings.substrate - 295) / 170) : 0,
     };
-    const decay = { plasma: .075, heat: .29, beam: .049 };
+    const decay = { plasma: .075, heat: .29, beam: .049, holder: .23 };
     for (const key of Object.keys(this.power)) {
       const target = targets[key];
       const time = target === 0 ? decay[key] : key === 'heat' ? .15 : .045;
@@ -244,6 +284,18 @@ export class ChamberTransport {
 
   draw(ctx) {
     ctx.clearRect(0, 0, CHAMBER.width, CHAMBER.height);
+    for (const particle of this.gasParticles) {
+      const { x, y, age, kind } = particle;
+      ctx.globalAlpha = .85 * Math.min(1, (1.65 - age) * 2.4) * Math.min(1, this.fill * 2.2);
+      ctx.fillStyle = kind === 'nitrogen' ? '#f5cb91' : '#a9ebad';
+      ctx.beginPath();
+      ctx.arc(x, y, kind === 'nitrogen' ? 1.38 : 1.75, 0, TAU);
+      if (kind === 'nitrogen') {
+        ctx.moveTo(x + 3.6, y + .7);
+        ctx.arc(x + 2.2, y + .7, 1.38, 0, TAU);
+      }
+      ctx.fill();
+    }
     const shades = { atom: '#8ccaff', argon: '#d9acff', 'metal-ion': '#7ee7f4', removed: '#ff9c6e', electron: '#ffd08a' };
     const fading = Math.max(0, 1 - this.darkTime / .85);
     for (const particle of this.particles) {

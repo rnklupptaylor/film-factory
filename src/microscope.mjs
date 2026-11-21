@@ -140,8 +140,9 @@ export class FilmMicroscope {
       const { gl } = this.gpu;
       gl.bufferData(gl.ARRAY_BUFFER, model.mesh, gl.DYNAMIC_DRAW);
     }
-    this.status.textContent = model.count
-      ? `${Math.round(model.coverage * 100)}% area covered · ${Math.round(model.voidFraction * 100)}% voids in envelope`
+    const roughness = model.roughnessNm > 0 && model.roughnessNm < .1 ? '&lt; 0.1' : `≈ ${model.roughnessNm.toFixed(1)}`;
+    this.status.innerHTML = model.count
+      ? `${Math.round(model.coverage * 100)}% area covered · ${Math.round(model.voidFraction * 100)}% voids in envelope · <span class="roughness" title="Modelled areal RMS height relative to the mean plane">S<sub>q</sub> ${roughness} nm</span>`
       : 'Bare substrate';
     const rendering = this.gpu ? 'SEM-style 3D view' : '2D height fallback';
     this.canvas.setAttribute('aria-label', `${rendering}. ${this.status.textContent}.`);
