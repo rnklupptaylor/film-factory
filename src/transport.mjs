@@ -256,11 +256,11 @@ export class ChamberTransport {
     }
   }
 
-  updateGas(dt, open, gas, settings, sample, reducedMotion, showParticles) {
+  updateGas(dt, open, gas, settings, sample, reducedMotion) {
     const target = Number(open);
     const fill = target + (this.fill - target) * Math.exp(-dt / (open ? .12 : .20));
     this.fill = reducedMotion ? target : fill < .0005 ? 0 : fill;
-    if (!showParticles || !gas || !this.fill) { this.gasParticles = []; this.gasBudget = 0; return; }
+    if (!gas || !this.fill) { this.gasParticles = []; this.gasBudget = 0; return; }
     const sourceY = sourceLevel(settings.distance);
     const meanPath = displayFreePath(sample.lambda, settings.distance);
     this.gasParticles = this.gasParticles.filter((particle) => {
@@ -288,7 +288,7 @@ export class ChamberTransport {
     }
   }
 
-  update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion, residue = 0, gasOpen = active, showParticles = !reducedMotion) {
+  update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion, residue = 0, gasOpen = active) {
     active = active && sample.targetIonOn !== 0;
     this.clock += dt;
     this.darkTime = active ? 0 : this.darkTime + dt;
@@ -297,9 +297,9 @@ export class ChamberTransport {
     const hasHeater = config.family !== 'sputtering' && !config.arc && !settings.preclean;
     const gas = processGas(config, settings);
     const sourceY = sourceLevel(settings.distance);
-    this.updateTargetArc(dt, active && showParticles && !reducedMotion ? sample.arcing : null, sourceY, pulse);
+    this.updateTargetArc(dt, active && !reducedMotion ? sample.arcing : null, sourceY, pulse);
     const flowing = gasOpen && gas != null && (!gas.gun || settings.ionCurrent > 0);
-    this.updateGas(dt, flowing, gas, settings, sample, reducedMotion, showParticles);
+    this.updateGas(dt, flowing, gas, settings, sample, reducedMotion);
     const targets = {
       plasma: active && hasPlasma && (reducedMotion || pulse) ? .56 + .4 * Math.min(1, (sample.targetIonOn ?? settings.ionCurrent + .35)) : 0,
       heat: active && hasHeater ? Math.min(1, .53 + .22 * Math.log1p(sample.gross * 5)) : 0,
@@ -313,7 +313,7 @@ export class ChamberTransport {
       const value = reducedMotion ? target : target + (this.power[key] - target) * Math.exp(-dt / time);
       this.power[key] = value < .004 ? 0 : value;
     }
-    if (!showParticles || (!active && this.darkTime >= .85)) {
+    if (!active && this.darkTime >= .85) {
       this.particles = [];
       this.impacts = [];
       this.budgets = {};
@@ -340,9 +340,8 @@ export class ChamberTransport {
     else this.budgets = {};
   }
 
-  draw(ctx, showParticles = true) {
+  draw(ctx) {
     ctx.clearRect(0, 0, CHAMBER.width, CHAMBER.height);
-    if (!showParticles) return;
     for (const particle of this.gasParticles) {
       const { x, y, age, kind, colour } = particle;
       const molecule = kind !== 'gas-argon';

@@ -27,6 +27,7 @@ test('build emits the self-contained app with its teaching version', () => {
   assert.equal(result.coverage, 0);
   assert.equal(result.grainMap.length, 1600);
   assert.match(page, /id="chamber-labels"[^>]+aria-pressed="true"/);
+  assert.doesNotMatch(page, /id="chamber-particles"/);
   scope.onmessage({ data: { segments: [], summaryOnly: true } });
   assert.equal(result.roughnessNm, 0);
   assert.equal(result.mesh, undefined);
