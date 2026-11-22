@@ -11,6 +11,12 @@ test('build emits the self-contained app with its teaching version', () => {
   assert.match(page, /Film Factory/);
   assert.ok(page.includes(pkg.teachingVersion ?? pkg.version));
   assert.doesNotMatch(page, /%%[A-Z.]+%%|<script[^>]+src=|<link[^>]+stylesheet/i);
+  assert.match(page, /<link rel="icon"[^>]+href="data:image\/svg\+xml,/);
+  assert.match(page, /<main id="cvd"/);
+  assert.match(page, /<main id="theory-page"/);
+  for (const [, section] of page.matchAll(/href="#theory\/([a-z-]+)"/g)) {
+    assert.ok(page.includes(`id="theory-${section}"`), `Missing Theory section: ${section}`);
+  }
   const script = page.match(/<script>([\s\S]+)<\/script>/)[1];
   assert.doesNotThrow(() => new Function(script));
   const worker = JSON.parse(script.match(/^\s*const morphologyWorkerCode = (.+);$/m)[1]);
@@ -27,7 +33,7 @@ test('build emits the self-contained app with its teaching version', () => {
   assert.match(page, /id="film-lightbox"/);
   assert.match(page, /data-background="light"/);
   assert.deepEqual([...page.matchAll(/data-plot="(\w+)" aria-pressed/g)].map(([, view]) => view),
-    ['source', 'growth', 'profile', 'morphology', 'zones', 'diagnostics', 'lightbox']);
+    ['source', 'growth', 'profile', 'diagnostics', 'zones', 'morphology', 'lightbox']);
   assert.match(page, /id="material"[\s\S]*?id="wafer"[\s\S]*?id="control-pages"/);
   assert.match(page, /id="preview-time".*min="5" max="180" step="5" value="60"/);
   assert.match(page, /id="growth-transport" hidden/);

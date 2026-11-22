@@ -1,5 +1,5 @@
 import { MATERIALS, POSITIONS, rates, advanceFilm, residueAfter } from './physics.mjs';
-import { TECHNIQUES, VARIANTS, RUN_LENGTH, THEORY, controlGroups, newSettings, sourceChart } from './content.mjs';
+import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups, newSettings, sourceChart } from './content.mjs';
 import { sci, chartMarkup, growthPlot, profilePlot } from './graphics.mjs';
 import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
@@ -31,7 +31,6 @@ let material = MATERIALS[settings.symbol];
 let sample = rates(config, settings, material);
 let controlPage = 0;
 let plot = 'growth';
-let theoryPage = 0;
 let experimentMode = 'preview';
 let previewTime = Number(el('preview-time').value);
 let running = false;
@@ -63,12 +62,32 @@ const valveOpen = () => running && chamber.feed != null && (!chamber.feed.gun ||
 const readPressure = () => chamberPressure(settings, chamber.feed, transport.fill);
 
 function route() {
-  page = location.hash === '#pvd' ? 'pvd' : 'home';
-  el('home').hidden = page !== 'home';
-  el('pvd').hidden = page !== 'pvd';
-  if (page === 'home' && running) pause();
+  const [destination, section] = location.hash.slice(1).split('/');
+  const pages = { home: 'Film Factory', pvd: 'The Atom Shop (PVD)', cvd: 'Chemical vapour deposition (CVD)', theory: 'Theory' };
+  const previous = page;
+  page = Object.hasOwn(pages, destination) ? destination : 'home';
+  for (const id of Object.keys(pages)) el(id === 'theory' ? 'theory-page' : id).hidden = page !== id;
+  if (page !== 'pvd' && running) pause();
   renderThermalWarning();
-  document.title = page === 'pvd' ? 'The Atom Shop (PVD) · Film Factory' : 'Film Factory';
+  document.title = page === 'home' ? pages.home : `${pages[page]} · Film Factory`;
+  if (page === 'theory') {
+    el('theory-link').setAttribute('aria-current', 'page');
+    if (previous !== 'theory') {
+      el('theory-return').href = `#${previous}`;
+      el('theory-return').textContent = `← ${previous === 'home' ? 'Main menu' : pages[previous]}`;
+    }
+    const heading = section && el(`theory-${section}`);
+    if (heading?.matches('h2')) {
+      heading.focus({ preventScroll: true });
+      heading.scrollIntoView();
+    } else {
+      el('theory-title').focus({ preventScroll: true });
+      el('theory-page').scrollTop = 0;
+    }
+  } else {
+    el('theory-link').removeAttribute('aria-current');
+    if (previous !== page) el(`${page}-title`).focus({ preventScroll: true });
+  }
 }
 
 function pressed(container, key, value) {
@@ -115,7 +134,6 @@ function showThermalDetails() {
   el('dialog-content').innerHTML = `<p><strong>${status.name}</strong> at ${settings.substrate} K exceeds the selected ${Math.round(status.limit)} K reference.</p>
     <p>${status.basis}. The simulation still shows an intact substrate. Fixture limits, load, exposure time and grade can lower usable temperatures.</p>
     <a href="${status.url}" target="_blank" rel="noopener noreferrer">Material data</a>`;
-  el('dialog-nav').hidden = true;
   el('dialog').showModal();
 }
 
@@ -136,7 +154,7 @@ function controlValue(key, value, unit) {
 
 function renderControls() {
   const technique = TECHNIQUES[family];
-  el('question').textContent = technique.question;
+  el('pvd-title').textContent = technique.title;
   el('summary').textContent = isPreclean() ? 'Ar⁺ bombards the negatively biased substrate with the evaporation source switched off.'
     : config.arc ? 'Ti vapour and ions leave the cathode. Nitrogen supplies the N in the TiN coating.'
     : config.ito === 'alloy' ? 'Argon ions eject In and Sn. Oxygen supplies the oxide in the growing ITO film.'
@@ -398,7 +416,6 @@ function showZoneNotes() {
   const sources = model.links.map(([label, url]) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('');
   el('dialog-content').innerHTML = `<p><strong>${model.subject}</strong></p><p>${model.detail}</p><p>${model.context}</p>
     <p>The diagram marks the current recipe settings. In Growth mode, the morphology records changes during the run.</p>${sources}`;
-  el('dialog-nav').hidden = true;
   el('dialog').showModal();
 }
 
@@ -644,21 +661,7 @@ function switchPreclean() {
 function openGuide() {
   el('dialog-title').textContent = 'Try it';
   el('dialog-content').innerHTML = `<p>${TECHNIQUES[family].summary}</p><p>${config.prompt}</p><p class="citation">Use Preview to see the estimated film at the selected time. Select Growth and press Run to watch the deposition and change settings as it proceeds.</p>`;
-  el('dialog-nav').hidden = true;
   el('dialog').showModal();
-}
-
-function renderTheory() {
-  const note = THEORY[theoryPage];
-  const link = (label, href) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-  el('dialog-title').textContent = note.title;
-  el('dialog-content').innerHTML = `<p>${note.text}</p>`
-    + (note.href ? link(note.label, note.href) : `<p class="citation">${note.note}</p>`)
-    + (note.extra ?? []).map(([label, href]) => link(label, href)).join('');
-  el('dialog-nav').hidden = false;
-  el('page-count').textContent = `${theoryPage + 1} of ${THEORY.length}`;
-  el('previous').disabled = theoryPage === 0;
-  el('next').disabled = theoryPage === THEORY.length - 1;
 }
 
 function theme(dark) {
@@ -771,10 +774,7 @@ el('enlarge-chamber').addEventListener('click', (event) => {
   button.setAttribute('aria-pressed', String(expanded));
   button.textContent = expanded ? 'Settings' : 'Expand';
 });
-el('theory').addEventListener('click', () => { renderTheory(); el('dialog').showModal(); });
 el('close').addEventListener('click', () => el('dialog').close());
-el('previous').addEventListener('click', () => { theoryPage--; renderTheory(); });
-el('next').addEventListener('click', () => { theoryPage++; renderTheory(); });
 el('theme').addEventListener('click', () => {
   manualTheme = true;
   theme(document.documentElement.dataset.theme !== 'dark');

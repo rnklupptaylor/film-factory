@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Explore physical vapour deposition in an interactive thin film teaching app.">
   <meta name="theme-color" content="#f3f3f0">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Crect x='1' y='1' width='32' height='32' rx='8' fill='%23256cbd'/%3E%3Cpath d='m8 22 9 4 9-4M8 17l9 4 9-4M8 12l9-4 9 4-9 4Z' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <title>Film Factory</title>
   <style>%%STYLE.CSS%%</style>
 </head>
@@ -17,24 +18,22 @@
       </svg>
       <span>Film Factory</span>
     </a>
-    <span class="course">Thin Film Processing</span>
     <div class="top-actions">
       <button id="thermal-warning" class="button thermal-warning" type="button" aria-label="Substrate thermal limit exceeded" hidden>⚠ Heat</button>
       <button id="theme" class="button theme" type="button" aria-label="Switch appearance" title="Switch appearance">◐</button>
-      <button id="theory" class="button" type="button">Theory</button>
+      <a id="theory-link" class="button" href="#theory">Theory</a>
     </div>
   </header>
 
   <main id="home" class="home">
     <div class="home-copy">
-      <p class="eyebrow">Thin Film Processing</p>
-      <h1>Film Factory</h1>
-      <p>Explore how thin films are made.</p>
+      <h1 id="home-title" tabindex="-1">Film Factory</h1>
+      <p>An interactive guide to thin-film deposition.</p>
     </div>
     <nav class="mode-menu" aria-label="Film Factory modes">
       <a class="mode-card" href="#pvd">
         <div class="mode-art">
-          <svg viewBox="0 0 520 230" role="img" aria-label="Atoms and ions travelling from a source to a thin film" preserveAspectRatio="xMidYMid slice">
+          <svg viewBox="0 0 520 230" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
             <defs>
               <pattern id="menu-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#9ebbe1" stroke-opacity=".23"/></pattern>
               <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#21446d"/><stop offset="1" stop-color="#142941"/></linearGradient>
@@ -59,14 +58,48 @@
           <span class="mode-action">Open mode</span>
         </div>
       </a>
+      <a class="mode-card" href="#cvd">
+        <div class="mode-art cvd-art">
+          <svg viewBox="0 0 520 230" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs>
+              <pattern id="cvd-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#b9dacb" stroke-opacity=".2"/></pattern>
+              <marker id="cvd-arrow" viewBox="0 0 6 6" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="m0 0 6 3-6 3Z" fill="#82d4ba"/></marker>
+            </defs>
+            <rect width="520" height="230" fill="url(#cvd-grid)"/>
+            <rect x="137" y="46" width="246" height="138" rx="27" fill="#1b3138" stroke="#87b5ae" stroke-width="2"/>
+            <path d="M109 90h53m197 0h52M260 184v27" stroke="#87b5ae" stroke-width="4"/>
+            <g fill="none" stroke="#82d4ba" stroke-width="2" stroke-linecap="round" marker-end="url(#cvd-arrow)">
+              <path d="M162 90h180"/><path d="m211 103 15 33"/><path d="M260 103v33"/><path d="m309 103-15 33"/>
+            </g>
+            <rect x="200" y="146" width="120" height="5" rx="2" fill="#a1e4c3"/>
+            <rect x="198" y="151" width="124" height="7" rx="2" fill="#c0d0d5"/>
+            <rect x="192" y="158" width="136" height="13" rx="4" fill="#465b66"/>
+            <path d="M217 164h86" stroke="#efb67a" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="mode-description">
+          <h2>Chemical vapour deposition (CVD)</h2>
+          <p>Film growth from gaseous precursors</p>
+          <span class="mode-status">In development</span>
+        </div>
+      </a>
     </nav>
+  </main>
+
+  <main id="cvd" class="cvd" hidden>
+    <article class="cvd-placeholder">
+      <a class="section-back" href="#home">← Main menu</a>
+      <h1 id="cvd-title" tabindex="-1">Chemical vapour deposition (CVD)</h1>
+      <p>The CVD simulator is in development. In CVD, gases carry the starting chemicals to the substrate, where reactions form a solid coating.</p>
+      <p><a href="#theory/cvd">Read about CVD and how it relates to PVD</a></p>
+    </article>
   </main>
 
   <main id="pvd" class="lab" hidden>
     <div class="lab-top">
       <div>
         <p class="eyebrow">The Atom Shop (PVD)</p>
-        <h1 id="question"></h1>
+        <h1 id="pvd-title" tabindex="-1"></h1>
       </div>
       <nav class="seg technique-nav" id="techniques" aria-label="PVD technique"></nav>
     </div>
@@ -110,9 +143,9 @@
           <button type="button" data-plot="source" aria-pressed="false">Source</button>
           <button type="button" data-plot="growth" aria-pressed="true">Growth</button>
           <button type="button" data-plot="profile" aria-pressed="false">Profile</button>
-          <button type="button" data-plot="morphology" aria-pressed="false">Morphology</button>
-          <button type="button" data-plot="zones" aria-pressed="false">Zone model</button>
           <button type="button" data-plot="diagnostics" aria-pressed="false">Sensors</button>
+          <button type="button" data-plot="zones" aria-pressed="false">Zone model</button>
+          <button type="button" data-plot="morphology" aria-pressed="false">Morphology</button>
           <button type="button" data-plot="lightbox" aria-pressed="false">Lightbox</button>
         </nav>
         <div id="graphic" class="graphic"></div>
@@ -188,7 +221,9 @@
     </div>
   </main>
 
-  <footer class="footer"><span>FAU Erlangen-Nürnberg · Prof. Robin N. Klupp Taylor</span><span>v%%VERSION%%</span></footer>
+  %%THEORY.HTML%%
+
+  <footer class="footer"><span>Concept by Prof. Robin N. Klupp Taylor · Developed with Codex</span><span>v%%VERSION%%</span></footer>
 
   <dialog id="dialog" aria-labelledby="dialog-title">
     <div class="dialog-shell">
@@ -197,11 +232,6 @@
         <button id="close" class="button" type="button">Close</button>
       </header>
       <div id="dialog-content" class="dialog-content"></div>
-      <nav class="dialog-nav" aria-label="Theory pages" id="dialog-nav">
-        <button id="previous" class="button" type="button">Previous</button>
-        <span id="page-count"></span>
-        <button id="next" class="button" type="button">Next</button>
-      </nav>
     </div>
   </dialog>
 

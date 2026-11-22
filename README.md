@@ -1,10 +1,10 @@
 # Film Factory
 
-Film Factory is a teaching app on thin film processing at FAU Erlangen-Nürnberg. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber.
+Film Factory is an interactive guide to thin-film deposition. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber. The menu also includes a placeholder for chemical vapour deposition (CVD).
 
 | Branch | Cloudflare address |
 | --- | --- |
-| `main` · Student release | https://film-factory.ipt-apps.workers.dev |
+| `main` · Public release | https://film-factory.ipt-apps.workers.dev |
 | `dev` · Development | https://dev-film-factory.ipt-apps.workers.dev |
 
 ## In The Atom Shop
@@ -21,7 +21,7 @@ Film Factory is a teaching app on thin film processing at FAU Erlangen-Nürnberg
 - **Sensors** include a 6 MHz QCM with Sauerbrey frequency shift, tooling factor and wafer comparison, a pressure gauge, a holder thermocouple, modelled gas partial pressures and a relative Ti optical emission signal for reactive sputtering.
 - **Substrates** include silicon, two glasses, stainless steel, polycarbonate and polyimide. The chamber shows the selected substrate mounted beneath a separately heated platen with a thermocouple. A warning identifies the thermal reference and links to the data.
 
-The in-app Theory pages document the lecture references, the literature and material data, and modelling assumptions. The rates are reduced-order teaching estimates. The morphology drawings illustrate trends.
+The Theory page introduces the deposition methods, explains the plots and instruments, and links to the scientific literature and material data. Expand the model details to find equations and assumptions. The rates are reduced-order teaching estimates. The morphology drawings illustrate trends.
 
 ## Build and test
 
@@ -36,4 +36,4 @@ Open `build/deploy/index.html` in a browser. The generated page is self-containe
 
 Cloudflare Workers Builds runs `npm run build`, publishes with `npx wrangler deploy`, and uses `npx wrangler preview` for preview builds. The production branch is `main`. Develop on `dev`, verify the preview and merge for release. The footer uses `teachingVersion` from `package.json`.
 
-MIT licence. Course and concept by Prof. Robin N. Klupp Taylor, FAU Erlangen-Nürnberg. Developed with Codex.
+MIT licence. Concept by Prof. Robin N. Klupp Taylor. Developed with Codex.
