@@ -9,7 +9,7 @@ const SUBSTRATE_FINISH = {
   silicon: ['#69748a', .36, .024, 0], borofloat: ['#8ca8a3', .08, .021, .92], silica: ['#b2c4cd', .03, .016, .94],
   steel: ['#a8b0b4', .75, .21, 0], polycarbonate: ['#b0bcb2', .07, .075, .87], kapton: ['#c77935', .03, .10, .45],
 };
-const TRANSPARENT_FILMS = new Set(['Indium tin oxide', 'Silica']);
+const TRANSPARENT_FILMS = new Set(['Indium tin oxide', 'Silica', 'Alumina']);
 
 export function lightboxFilmAppearance(profile, model) {
   const centre = Math.floor(profile.length / 2);

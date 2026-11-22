@@ -1,3 +1,5 @@
+import { hasAluminaRecipe } from './arcing.mjs';
+
 export const SUBSTRATES = {
   silicon: { name: 'Silicon wafer', limit: 1687, basis: 'Bulk melting point', affinity: .45, oxide: true, url: 'https://periodic-table.rsc.org/element/14/Silicon' },
   borofloat: { name: 'Borosilicate glass · BOROFLOAT 33', limit: 723.15, basis: 'Manufacturer long-term maximum, 450 °C. SCHOTT gives 500 °C for exposures under 10 hours', affinity: .36, oxide: true, url: 'https://www.schott.com/en-us/products/borofloat/technical-details' },
@@ -41,7 +43,8 @@ export function processGas(config, settings) {
   if (config.family === 'evaporation') return null;
   if (config.ibad) return { gun: true, label: 'Ar to gun', species: [['Ar', 1]] };
   if (config.arc) return { gun: false, label: 'N₂', species: [['N₂', 1]] };
-  const reactive = config.reactive ? ['N₂', settings.nitrogen / 100] : config.ito ? ['O₂', settings.oxygen / 100] : null;
+  const reactive = config.reactive ? ['N₂', settings.nitrogen / 100]
+    : config.ito || hasAluminaRecipe(config, settings.symbol) ? ['O₂', (settings.oxygen ?? 0) / 100] : null;
   const species = reactive ? [['Ar', 1 - reactive[1]], reactive] : [['Ar', 1]];
   return { gun: false, label: species.filter(([, fraction]) => fraction > 0).map(([name]) => name).join(' + '), species };
 }

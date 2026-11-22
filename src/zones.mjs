@@ -184,6 +184,18 @@ export function zoneModel(config, settings, sample) {
   if (config.family === 'evaporation') model = thermalZones(theta);
   else if (config.family === 'plating') model = ionWindow(config, settings, sample, theta, fullPressure);
   else if (config.ito) model = compoundWindow(config, settings, film, partial('O₂'));
+  else if (film.formula === 'Al₂O₃') {
+    const oxygen = partial('O₂');
+    model = {
+      name: 'Reactive alumina · process coordinates',
+      kind: 'window', x: TEMPERATURE, y: axis('O₂ partial pressure (Pa)', [0,.01,.03,.1,.3,1,2.5], (v) => Math.log1p(v / .01)),
+      point: [settings.substrate, oxygen],
+      operating: `Tₛ = ${settings.substrate} K · p(O₂) = ${oxygen.toPrecision(3)} Pa`,
+      reading: 'Nominal amorphous Al₂O₃',
+      detail: 'These coordinates describe the reactive recipe. Alumina phase and stoichiometry depend on the reactor and deposition conditions.',
+      links: [['Reactive sputtering of amorphous aluminium oxide', 'https://doi.org/10.1016/S0040-6090(98)01232-2']],
+    };
+  }
   else if (film.formula === 'TiN') model = compoundWindow(config, settings, film, partial('N₂'));
   else if (film.formula === 'SiO₂') model = compoundWindow(config, settings, film, partial('Ar'));
   else model = thorntonZones(config, theta, partial('Ar'));

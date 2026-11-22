@@ -302,10 +302,14 @@ select {
 .wafer-limit.above-limit { color: #b94b19; font-weight: 720; }
 :root[data-theme="dark"] .wafer-limit.above-limit { color: #ffb078; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-width: 0; }
+.metrics.has-arcing { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .metric { min-width: 0; padding: .35rem .74rem; }
 .metric + .metric { border-left: 1px solid var(--line); }
 .metric dt { color: var(--muted); font-size: .79rem; }
 .metric dd { font: 690 clamp(.92rem, 1.6vw, 1.2rem)/1.3 var(--mono); color: var(--ink); }
+.arc-metric[data-severity="moderate"] dd { color: #875011; }
+.arc-metric[data-severity="high"] dd, .arc-metric[data-severity="severe"] dd { color: var(--loss); }
+:root[data-theme="dark"] .arc-metric[data-severity="moderate"] dd { color: #ffd190; }
 .metric small { font: 500 .72rem system-ui, sans-serif; white-space: nowrap; }
 .experiment-bar { display: flex; align-items: center; gap: .65rem; min-width: 0; }
 .experiment-bar > .seg { flex: 0 0 auto; }
@@ -499,6 +503,10 @@ dialog::backdrop { background: #0c1935a0; }
   #enlarge-chamber { display: block; min-height: 23px; padding: .08rem .29rem; font-size: .7rem; }
   .chamber-footer { justify-content: space-between; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics.has-arcing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .metrics.has-arcing .metric:nth-child(3) { border-top: 0; border-left: 1px solid var(--line); }
+  .metrics.has-arcing .metric:nth-child(4) { border-left: 0; }
+  .metrics.has-arcing .arc-metric { grid-column: span 2; }
   .metric { padding: .15rem .4rem; overflow: hidden; }
   .metric:nth-child(3) { border-left: 0; }
   .metric:nth-child(n+3) { border-top: 1px solid var(--line); }
@@ -627,6 +635,9 @@ dialog::backdrop { background: #0c1935a0; }
   .slider input { height: 19px; margin: 0; }
   .seg button { min-height: 23px; padding-block: .1rem; }
   .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .metrics.has-arcing { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .metrics.has-arcing .metric:nth-child(4) { border-left: 1px solid var(--line); }
+  .metrics.has-arcing .arc-metric { grid-column: auto; }
   .metric { padding: .1rem .3rem; }
   .metric:nth-child(n+3) { border-top: 0; border-left: 1px solid var(--line); }
   .metric dt { font-size: .68rem; }
@@ -645,7 +656,7 @@ dialog::backdrop { background: #0c1935a0; }
   #compact-guide { display: block; }
   #compact-preclean { display: block; }
 }
-@media (max-width: 650px) and (max-height: 740px), (max-height: 660px) {
+@media (max-width: 1180px) and (max-height: 740px), (max-height: 660px) {
   .mobile-nav { display: flex; }
   .mobile-nav [data-mobile="settings"] { display: block; }
   .mobile-nav button { flex-basis: auto; padding-inline: .22rem; font-size: .76rem; }
@@ -658,16 +669,17 @@ dialog::backdrop { background: #0c1935a0; }
   .workspace[data-mobile="chamber"] .controls, .workspace[data-mobile="chamber"] .results,
   .workspace[data-mobile="plots"] .controls, .workspace[data-mobile="plots"] .chamber { display: none; }
 }
-@media (min-width: 651px) and (max-height: 660px) {
+@media (min-width: 651px) and (max-width: 1180px) and (max-height: 740px), (min-width: 651px) and (max-height: 660px) {
   .lab { grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
   .summary { display: none; }
 }
-@media (min-width: 480px) and (max-height: 660px) {
+@media (min-width: 480px) and (max-width: 1180px) and (max-height: 740px), (min-width: 480px) and (max-height: 660px) {
   .controls .panel-header { display: none; }
   #compact-guide, #compact-preclean { display: block; }
   .process-settings { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .process-settings > :is(.method-control, #substrate-temperature-control) { grid-column: auto; }
-  .source-sliders { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .source-sliders { grid-template-columns: repeat(auto-fit, minmax(min(100%, 78px), 1fr)); }
+  .source-sliders > :only-child { grid-column: auto; }
 }
 @media (max-width: 479px) and (max-height: 740px) {
   #compact-guide { display: none; }
@@ -683,9 +695,28 @@ dialog::backdrop { background: #0c1935a0; }
   .source-sliders { gap: .12rem .45rem; }
   .slider input { height: 18px; }
   .slider label { font-size: .71rem; }
+  .lab:has(.metrics.has-arcing) .workspace[data-mobile="settings"] .controls .panel-header { display: none; }
+  .lab:has(.metrics.has-arcing) #compact-guide { display: block; }
+  .lab:has(.metrics.has-arcing) .mobile-nav button { padding-inline: .18rem; font-size: .71rem; }
+  .lab:has(.metrics.has-arcing) .process-settings { gap: .08rem .42rem; }
+  .lab:has(.metrics.has-arcing) .source-sliders { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .1rem .32rem; }
+  .lab:has(.metrics.has-arcing) .slider { column-gap: .24rem; }
+  .lab:has(.metrics.has-arcing) .slider input { height: 16px; }
+  .lab:has(.metrics.has-arcing) .slider output { font-size: .68rem; }
 }
 @media (max-height: 660px) {
   .lab:has(.workspace[data-mobile="settings"]) .metrics { display: none; }
+}
+@media (min-height: 370px) and (max-height: 660px) {
+  .lab:has(.workspace[data-mobile="settings"]) .metrics.has-arcing { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .lab:has(.workspace[data-mobile="settings"]) .metrics.has-arcing .metric:not(.arc-metric) { display: none; }
+  .lab:has(.workspace[data-mobile="settings"]) .arc-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    grid-column: auto;
+    border: 0;
+  }
 }
 @media (min-width: 480px) and (max-width: 970px) and (max-height: 475px) {
   .lab-top h1 { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }

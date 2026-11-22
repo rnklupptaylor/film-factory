@@ -1,3 +1,5 @@
+import { hasAluminaRecipe, sputterArcing } from './arcing.mjs';
+
 export const KB = 1.380649e-23;
 export const E = 1.602176634e-19;
 const AVOGADRO = 6.02214076e23;
@@ -18,6 +20,7 @@ export const MATERIALS = {
   Cu: { name: 'Copper', mass: 63.546, density: 8960, melting: 1358, vapour: [773,921,1117,1390], yields: [[17,0],[60,.10],[100,.48],[200,1.10],[300,1.59],[600,2.3]], colour: '#e5a678' },
   Ti: { name: 'Titanium', mass: 47.867, density: 4500, melting: 1941, vapour: [1134,1325,1576,1921], yields: [[20,0],[100,.081],[200,.22],[300,.33],[600,.6]], colour: '#aeb8d4' },
   SiO2: { name: 'Silica', formula: 'SiO₂', mass: 60.084, density: 2200, colour: '#a3cddd' },
+  Al2O3: { name: 'Alumina', formula: 'Al₂O₃', mass: 101.961, density: 3200, colour: '#c4d6e7' },
   TiN: { name: 'Titanium nitride', formula: 'TiN', mass: 61.874, density: 5220, colour: '#e4ba65' },
   // The sputtered tracer mass is representative of In-rich metal species.
   ITO: { name: 'Indium tin oxide', formula: 'ITO', mass: 114.8, density: 7140, colour: '#9ae1cf' },
@@ -55,6 +58,15 @@ function volumePerParticle(material) {
 
 function thicknessRate(flux, material) {
   return flux * volumePerParticle(material) * 1e9;
+}
+
+function aluminaCoverage(oxygenPressure, ionCurrent, oxideYield) {
+  // A steady-state balance of chemisorbed oxygen and sputter removal.
+  // O₂ supplies 4/3 Al-equivalents per sticking molecule for Al₂O₃.
+  const oxygenMass = .031998 / AVOGADRO;
+  const uptake = 4 / 3 * .015 * oxygenPressure / Math.sqrt(2 * Math.PI * oxygenMass * KB * 300);
+  const removal = ionCurrent * oxideYield / (E * .0025);
+  return uptake / (uptake + removal);
 }
 
 export function rates(config, settings, material) {
@@ -101,7 +113,19 @@ export function rates(config, settings, material) {
       yieldValue *= 1 - .63 * poisoning;
       film = nitrogen >= TIN_NITROGEN_PA ? MATERIALS.TiN : material;
     }
-    if (material.yields) gross = thicknessRate(ionCurrent / E * yieldValue * geometry * transmission, film);
+    if (hasAluminaRecipe(config, settings.symbol) && settings.oxygen > 0) {
+      const oxygenPa = (100 * 10 ** pressure) * (settings.oxygen / 100);
+      // Partial Al yield of the poisoned branch, of the order measured
+      // by Schelfhout et al. The study also shows dependence on energy.
+      const oxideYield = Math.min(.02, yieldValue);
+      poisoning = aluminaCoverage(oxygenPa, ionCurrent, oxideYield);
+      yieldValue = (1 - poisoning) * yieldValue + poisoning * oxideYield;
+      if (poisoning >= .6) film = MATERIALS.Al2O3;
+    }
+    if (material.yields) {
+      const alAtomsPerUnit = film === MATERIALS.Al2O3 ? 2 : 1;
+      gross = thicknessRate(ionCurrent / E * yieldValue / alAtomsPerUnit * geometry * transmission, film);
+    }
   } else {
     film = config.arc ? MATERIALS.TiN : material;
     const gapScale = (.14 / gap) ** 2;
@@ -132,7 +156,8 @@ export function rates(config, settings, material) {
     const scattered = config.family === 'evaporation' ? direct : .88 + .12 * direct;
     return gross * (direct * ballistic + scattered * (1 - ballistic));
   });
-  return { gross, loss, net: gross - loss, localGross, vapour, yieldValue, ionEnergy, ionDose, poisoning, lambda, ballistic, film, theta, cleanRate };
+  const arcing = sputterArcing(config, settings, poisoning);
+  return { gross, loss, net: gross - loss, localGross, vapour, yieldValue, ionEnergy, ionDose, poisoning, lambda, ballistic, film, theta, cleanRate, arcing };
 }
 
 export function residueAfter(fraction, sample, seconds, filmAtCentre = 0) {

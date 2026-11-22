@@ -1,4 +1,5 @@
 import { MATERIALS, POSITIONS, rates } from './physics.mjs';
+import { hasAluminaRecipe } from './arcing.mjs';
 import { SUBSTRATES, crystalFrequencyShift } from './instruments.mjs';
 import { VARIANTS, controlGroups } from './content.mjs';
 import { chartMarkup, sci } from './graphics.mjs';
@@ -68,7 +69,8 @@ const stockerColumns = [
   ['gap', 'L (cm)', (wafer) => wafer.settings.distance],
   ['source', 'Source settings', stockerSourceSettings],
   ['gas', 'Reactive gas', (wafer) => VARIANTS[wafer.variant].arc ? 'N₂' : VARIANTS[wafer.variant].reactive
-    ? `N₂ · ${wafer.settings.nitrogen}%` : VARIANTS[wafer.variant].ito ? `O₂ · ${wafer.settings.oxygen}%` : '—'],
+    ? `N₂ · ${wafer.settings.nitrogen}%` : VARIANTS[wafer.variant].ito
+      || (wafer.settings.oxygen > 0 && hasAluminaRecipe(VARIANTS[wafer.variant], wafer.settings.symbol)) ? `O₂ · ${wafer.settings.oxygen}%` : '—'],
   ['created', 'Added', (wafer) => wafer.created, (value) => stockerDate.format(value)],
 ];
 

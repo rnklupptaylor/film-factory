@@ -1,6 +1,7 @@
 import { MATERIALS, POSITIONS } from './physics.mjs';
 import { SUBSTRATES, substrateStatus } from './instruments.mjs';
 import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups } from './content.mjs';
+import { DEFAULT_PULSE_KHZ } from './arcing.mjs';
 
 export const STOCKER_FORMAT = 'film-factory-wafer-stocker';
 export const STOCKER_SCHEMA = 1;
@@ -13,11 +14,18 @@ const stockerNumber = (value, min = 0, max = 1e9) => Number.isFinite(value) && v
 const stockerRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const stockerOwn = (object, key) => typeof key === 'string' && Object.hasOwn(object, key);
 
+function waferArcSettings(variant, settings) {
+  const config = VARIANTS[variant];
+  if (!config.arcing) return settings;
+  return { oxygen: 0, ...(config.duty ? { frequency: DEFAULT_PULSE_KHZ } : {}), ...settings };
+}
+
 function validWaferRecipe(variant, settings) {
   const config = VARIANTS[variant];
   if (!stockerRecord(settings) || !config.materials.includes(settings.symbol) || !stockerOwn(SUBSTRATES, settings.wafer)) return false;
+  const actual = waferArcSettings(variant, settings);
   return controlGroups(config, MATERIALS[settings.symbol]).flat().every(([key, , , min, max]) =>
-    stockerNumber(settings[key], min - 1e-8, max + 1e-8))
+    stockerNumber(actual[key], min - 1e-8, max + 1e-8))
     && (!config.classic || typeof settings.preclean === 'boolean');
 }
 
@@ -63,6 +71,12 @@ export function readWaferFile(text) {
     || typeof file.title !== 'string' || file.title.length > 100 || !Array.isArray(file.wafers)
     || file.wafers.length > WAFER_FILE_COUNT || !file.wafers.every(validWafer)) {
     throw new Error('This file does not contain a valid Film Factory wafer collection.');
+  }
+  for (const wafer of file.wafers) {
+    wafer.settings = waferArcSettings(wafer.variant, wafer.settings);
+    if (VARIANTS[wafer.variant].arcing) {
+      wafer.recipes = wafer.recipes.map((recipe) => ({ ...recipe, settings: waferArcSettings(wafer.variant, recipe.settings) }));
+    }
   }
   return file;
 }

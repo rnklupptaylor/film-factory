@@ -19,7 +19,7 @@ const rateNumber = (value) => value !== 0 && Math.abs(value) < .01 ? sci(value) 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
 const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
-const standaloneSettings = matchMedia('(max-width: 650px) and (max-height: 740px), (max-height: 660px)');
+const standaloneSettings = matchMedia('(max-width: 1180px) and (max-height: 740px), (max-height: 660px)');
 const transport = new ChamberTransport();
 const bareFilm = POSITIONS.map(() => 0);
 const resultsPanel = document.querySelector('.results');
@@ -256,6 +256,7 @@ function drawChamberSurface() {
 }
 
 function drawChamberMotion() {
+  if (!running || gasLeadIn || motionPreference.matches || !sample.arcing) transport.clearTargetArc();
   const { plasma, heat, beam, holder } = transport.power;
   chamber.plasma?.setAttribute('opacity', plasma);
   chamber.beam?.setAttribute('opacity', beam);
@@ -301,7 +302,12 @@ function renderMetrics() {
     ['Mean free path λ', ...lambdaLabel],
     specific,
   ];
-  el('metrics').innerHTML = values.map(([label, value, unit]) => `<div class="metric"><dt>${label}</dt><dd>${value} <small>${unit}</small></dd></div>`).join('');
+  const metrics = el('metrics');
+  metrics.classList.toggle('has-arcing', Boolean(sample.arcing));
+  const arcing = sample.arcing;
+  metrics.innerHTML = values.map(([label, value, unit]) => `<div class="metric"><dt>${label}</dt><dd>${value} <small>${unit}</small></dd></div>`).join('')
+    + (arcing ? `<div class="metric arc-metric" data-severity="${arcing.severity.toLowerCase()}"><dt>Arcing</dt><dd>${arcing.severity}
+      <small>${arcing.reverseUs ? `${number(arcing.reverseUs, 2)} µs reverse` : 'recipe estimate'}</small></dd></div>` : '');
 }
 
 function renderSource({ config, settings, material, sample, clean, profile, preview, duration }) {
@@ -324,6 +330,7 @@ function renderSource({ config, settings, material, sample, clean, profile, prev
     caption = config.ito === 'ceramic' ? 'Reference-scale rate. The conductive ceramic supplies indium, tin and oxygen. O₂ affects film properties, which this rate model leaves fixed.'
       : config.ito === 'alloy' ? `Modelled oxide coverage of the target ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
       : config.reactive ? `Modelled target coverage by compound ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
+      : sample.arcing && sample.poisoning !== undefined ? `Modelled target oxide coverage ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.formula ?? sample.film.name}. Y counts ejected Al atoms per ion.`
       : material.yields ? 'Approximate Ar⁺ yield for normal incidence on the selected metal.' : 'Effective rate model for an insulating silica target at 13.56 MHz.';
   } else if (clean) {
     const h = preview ? 0 : waferCentre(profile);

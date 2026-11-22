@@ -1,4 +1,5 @@
 import { MATERIALS, rates } from './physics.mjs';
+import { hasAluminaRecipe } from './arcing.mjs';
 import { VARIANTS } from './content.mjs';
 import { crystalFrequencyShift } from './instruments.mjs';
 import { waferCentre } from './wafer-data.mjs';
@@ -14,8 +15,9 @@ export const waferGraphGroups = [
     current: { label: 'Effective target ion current (A)', value: ({ config, settings }) => config.family === 'sputtering'
       ? settings.current * (config.duty ? settings.duty / 100 : 1) : null },
     duty: { label: 'Duty cycle (%)', value: ({ config, settings }) => config.duty ? settings.duty : null },
+    frequency: { label: 'Pulse frequency (kHz)', value: ({ config, settings }) => config.arcing && config.duty ? settings.frequency : null },
     nitrogen: { label: 'Nitrogen fraction (%)', value: ({ config, settings }) => config.arc ? 100 : config.reactive ? settings.nitrogen : null },
-    oxygen: { label: 'Oxygen fraction (%)', value: ({ config, settings }) => config.ito ? settings.oxygen : null },
+    oxygen: { label: 'Oxygen fraction (%)', value: ({ config, settings }) => config.ito || hasAluminaRecipe(config, settings.symbol) ? settings.oxygen : null },
     bias: { label: 'Substrate bias (V)', value: ({ config, settings }) => config.arc || config.classic ? -settings.bias : null },
     ionEnergy: { label: 'Effective substrate ion energy (eV)', value: ({ sample }) => sample.ionEnergy },
     ionCurrent: { label: 'Substrate ion current density (mA/cm²)', value: ({ config, settings }) => config.family === 'plating' ? settings.ionCurrent : null },

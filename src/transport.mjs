@@ -5,6 +5,7 @@ const TRACER_LIMIT = 190;
 const ARGON_MASS = 39.95;
 const GAS_TRACERS = { Ar: ['gas-argon', ARGON_MASS, '#a9ebad'], 'N₂': ['nitrogen', 28.01, '#f5cb91'], 'O₂': ['oxygen', 32, '#ffb2b9'] };
 const TAU = 2 * Math.PI;
+const ARC_FLASH_SECONDS = .16;
 const uniform = (random, min, max) => min + random() * (max - min);
 const opticalDepth = (random) => -Math.log(Math.max(1e-8, 1 - random()));
 const fluxCount = (rate) => rate <= 0 ? 0 : Math.min(115, 34 * Math.log1p(40 * rate));
@@ -97,8 +98,9 @@ function guidedStep(particle, dt) {
 }
 
 export class ChamberTransport {
-  constructor(random = Math.random) {
+  constructor(random = Math.random, arcRandom = Math.random) {
     this.random = random;
+    this.arcRandom = arcRandom;
     this.clear();
   }
 
@@ -111,12 +113,35 @@ export class ChamberTransport {
     this.budgets = {};
     this.clock = 0;
     this.darkTime = 1;
+    this.clearTargetArc();
     this.power = { plasma: 0, heat: 0, beam: 0, holder: 0 };
   }
 
   get visible() {
     return this.particles.length > 0 || this.impacts.length > 0 || this.gasParticles.length > 0
       || this.fill > 0 || Object.values(this.power).some((power) => power > 0);
+  }
+
+  clearTargetArc() {
+    this.targetArc = null;
+    this.arcCooldown = 0;
+  }
+
+  updateTargetArc(dt, arcing, sourceY, pulse) {
+    if (!arcing) {
+      this.clearTargetArc();
+      return;
+    }
+    if (this.targetArc && (this.targetArc.age += dt) >= ARC_FLASH_SECONDS) this.targetArc = null;
+    this.arcCooldown = Math.max(0, this.arcCooldown - dt);
+    if (this.arcCooldown > 0 || !pulse) return;
+    const random = this.arcRandom;
+    if (random() >= -Math.expm1(-arcing.flashRate * dt)) return;
+    // The localised, time-stretched flashes are illustrative. Limit their
+    // cadence and keep the high-contrast region close to the cathode face.
+    this.arcCooldown = .52;
+    const x = (random() < .5 ? 259 : 341) + uniform(random, -24, 24);
+    this.targetArc = { x, y: sourceY - 1, age: 0, tilt: uniform(random, -5, 5) };
   }
 
   emit(kind, x, y, speed, direction, mass) {
@@ -271,6 +296,8 @@ export class ChamberTransport {
     const hasPlasma = config.family === 'sputtering' || config.classic || config.arc;
     const hasHeater = config.family !== 'sputtering' && !config.arc && !settings.preclean;
     const gas = processGas(config, settings);
+    const sourceY = sourceLevel(settings.distance);
+    this.updateTargetArc(dt, active && !reducedMotion ? sample.arcing : null, sourceY, pulse);
     const flowing = gasOpen && gas != null && (!gas.gun || settings.ionCurrent > 0);
     this.updateGas(dt, flowing, gas, settings, sample, reducedMotion);
     const targets = {
@@ -292,7 +319,6 @@ export class ChamberTransport {
       this.budgets = {};
       return;
     }
-    const sourceY = sourceLevel(settings.distance);
     const meanPath = displayFreePath(sample.lambda, settings.distance);
     const current = this.particles;
     this.particles = [];
@@ -368,6 +394,30 @@ export class ChamberTransport {
       ctx.arc(x, y, 2.5 + 28 * age, 0, TAU);
       ctx.stroke();
     }
+    if (this.targetArc) this.drawTargetArc(ctx);
     ctx.globalAlpha = 1;
+  }
+
+  drawTargetArc(ctx) {
+    const { x, y, age, tilt } = this.targetArc;
+    const fade = (1 - age / ARC_FLASH_SECONDS) ** 1.5;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, 16);
+    glow.addColorStop(0, '#fff3d4');
+    glow.addColorStop(.28, '#ffd28cdb');
+    glow.addColorStop(1, '#ffb66100');
+    ctx.globalAlpha = fade * .88;
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - 16, y - 16, 32, 32);
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = '#fff7dd';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x - 7, y);
+    ctx.lineTo(x, y - 1);
+    ctx.lineTo(x - 2 + tilt / 2, y - 5);
+    ctx.lineTo(x + tilt, y - 12);
+    ctx.moveTo(x, y - 1);
+    ctx.lineTo(x + 7, y - 5);
+    ctx.stroke();
   }
 }

@@ -225,7 +225,7 @@ export function chamberMarkup(config, method, settings, material, film) {
   const hasPlasma = gas && !gas.gun;
   const wafer = WAFER_VIEW[settings.wafer] ?? WAFER_VIEW.silicon;
   const pumpY = config.ibad ? 300 : 269;
-  const product = config.arc || config.ito ? film.formula : '';
+  const product = config.arc || config.ito || film.formula === 'Al₂O₃' ? film.formula : '';
   const plasmaY = config.classic ? 175 : config.diode ? y - 99 : y - 52;
   const preclean = config.classic && settings.preclean;
   const substrate = config.classic || config.arc ? 'Negatively biased substrate' : 'Substrate holder at ground';

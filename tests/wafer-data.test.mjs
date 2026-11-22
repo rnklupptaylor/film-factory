@@ -56,6 +56,17 @@ test('new and previously saved wafers have the same technique, subtechnique and 
   }
 });
 
+test('older pulsed aluminium wafers receive compatible arcing controls when reloaded', () => {
+  const original = exampleWafer('pulsed', 'Al');
+  delete original.settings.oxygen;
+  delete original.settings.frequency;
+  const { wafers: [wafer] } = readWaferFile(JSON.stringify(waferFile('Older wafers', [original])));
+  assert.equal(wafer.settings.oxygen, 0);
+  assert.equal(wafer.settings.frequency, 40);
+  assert.equal(wafer.recipes[0].settings.frequency, 40);
+  assert.deepEqual(wafer.profile, original.profile);
+});
+
 test('wafer export filenames are short and based on the collection title', () => {
   assert.equal(waferFilename('  Étude Ag / distance  '), 'wafers-etude-ag-distance.json');
   assert.ok(waferFilename('Very long series of thin film experiments for evaporation').length <= 40);
