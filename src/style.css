@@ -154,7 +154,9 @@ select {
   background: linear-gradient(45deg, transparent 50%, var(--muted) 50%) calc(100% - 13px) 53% / 5px 5px no-repeat, linear-gradient(135deg, var(--muted) 50%, transparent 50%) calc(100% - 8px) 53% / 5px 5px no-repeat, var(--surface);
   text-overflow: ellipsis;
 }
-.control-nav .seg button, .control-nav button, .plot-nav button { padding-inline: .33rem; }
+.control-nav .seg button, .control-nav button { padding-inline: .33rem; }
+.plot-nav { flex-wrap: wrap; }
+.plot-nav button { padding-inline: .33rem; white-space: normal; }
 .slider { min-width: 0; }
 .slider label { display: flex; justify-content: space-between; align-items: baseline; gap: .25rem; font-size: .88rem; font-weight: 640; }
 .slider output { color: var(--accent); font-family: var(--mono); font-size: .84rem; white-space: nowrap; }
@@ -375,15 +377,16 @@ dialog::backdrop { background: #0c1935a0; }
   .experiment-bar:has(#growth-transport:not([hidden])) .transport { flex-basis: 100%; justify-content: space-between; }
 }
 @media (max-width: 360px) {
-  .plot-nav button { font-size: .73rem; padding-inline: .20rem; }
   .topbar .brand { gap: .35rem; font-size: 1.05rem; }
   .top-actions { gap: .25rem; }
   .topbar .button { padding-inline: .34rem; }
   .thermal-warning { white-space: nowrap; }
 }
-@container film-results (max-width: 455px) {
-  .plot-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@container film-results (max-width: 31rem) {
+  .plot-nav { display: grid; grid-template-columns: repeat(4, minmax(min-content, 1fr)); }
   .plot-nav button { min-height: 25px; padding: .12rem .19rem; font-size: .75rem; }
+}
+@container film-results (max-width: 455px) {
   .lightbox-view .model-toolbar { gap: .18rem; flex-wrap: wrap; }
   .lightbox-view .model-toolbar .seg button { padding-inline: .3rem; }
   .zone-tick { font-size: 13px; }
@@ -497,7 +500,7 @@ dialog::backdrop { background: #0c1935a0; }
   .results:has(:is(.model-view, .lightbox-view):not([hidden])) .panel-header { flex-wrap: wrap; }
   .results:has(:is(.model-view, .lightbox-view):not([hidden])) .plot-nav {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(min-content, 1fr));
     grid-row: 2;
   }
   .results:has(:is(.model-view, .lightbox-view):not([hidden])) .plot-nav button { padding: .12rem .17rem; font-size: .73rem; }
