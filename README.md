@@ -1,6 +1,6 @@
 # Film Factory
 
-Film Factory is an interactive guide to thin-film deposition. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber. The menu also includes a placeholder for chemical vapour deposition (CVD).
+Film Factory is an interactive guide to thin-film deposition. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber. **The Reaction Room (CVD)** is the placeholder for chemical vapour deposition.
 
 | Branch | Cloudflare address |
 | --- | --- |
@@ -10,7 +10,9 @@ Film Factory is an interactive guide to thin-film deposition. Open **The Atom Sh
 ## In The Atom Shop
 
 - **Evaporation** includes direct and indirect resistance heating, electron beam heating and radiation heating. Vary source temperature, pressure, distance and substrate temperature.
-- **Sputtering** opens with conventional DC diode sputtering. Compare it with DC, pulsed DC, RF at 13.56 MHz and reactive Ti magnetrons. Two industrially grounded ITO recipes compare pulsed DC sputtering of a conductive ceramic with reactive sputtering of an In–Sn alloy in Ar/O₂. The chamber shows the magnet poles and magnetic field B for the magnetron methods.
+- **Sputtering** offers DC diode, DC magnetron, Pulsed DC magnetron and RF at 13.56 MHz. The two DC magnetron methods show optional O₂ for Al and N₂ for Ti. In Pulsed DC magnetron, select an ITO ceramic or In–Sn alloy target to explore the two ITO routes. The chamber shows the magnet poles and magnetic field B for the magnetron methods.
+- **Supply mode** in DC sputtering lets students set power, voltage or current and see the estimated electrical operating point and ion bombardment. Pulsed DC distinguishes on-state and average values. Independent **Ion settings** remain available and are used for RF and the ITO target recipes. The Stocker can compare centre deposition per joule at the final recipe settings. Theory documents the experimental anchors and model limits.
+- **Arcing** shows relative risk for DC and pulsed DC magnetron sputtering. With an Al target, vary oxygen to explore oxide formation and then vary duty and frequency to see the effect of pulse reversal. Growth displays localised target flashes at an illustrative cadence. Theory explains the measured trends and model assumptions.
 - **Ion plating** includes classic plasma-based plating, cathodic arc ion plating of TiN in N₂ and ion beam assisted deposition. Brightened neutral trajectories illustrate source-to-substrate transport in classic ion plating and IBAD. Use **Pre-clean** in classic ion plating to turn off the coating source while Ar⁺ removes modelled surface residue. Switch to **Deposit** to grow a film on the prepared substrate.
 - **Preview** projects the result from a bare substrate at the current settings over 5–180 seconds, with a default of 60 seconds. **Growth** lets you run, pause and reset a 60-second simulation. Returning from Preview restores the paused run.
 - **Film and diagnostics** includes the source response, centre thickness over time, the 100 mm wafer profile and a rotatable 3D morphology. The SEM-style view uses coarse stochastic deposition, shadowing, surface hops and resputtering. The surface grid gives a modelled areal RMS roughness estimate.
@@ -25,7 +27,7 @@ The Theory page introduces the deposition methods, explains the plots and instru
 
 ## Wafer stocker
 
-Use **Add to Stocker** for any Preview or once a Growth run completes. The stocker keeps the recipe, recorded process changes, and film results in this browser. Double-click a row or choose **Inspect wafer** to reopen its Film & Diagnostics. The inspector can load the final saved recipe into a fresh PVD case.
+Use **Add to Stocker** for any Preview or once a Growth run completes. The stocker keeps the recipe, recorded process changes, and film results in this browser. Its sortable columns distinguish technique, subtechnique and method. Double-click a row or choose **Inspect wafer** to reopen its Film & Diagnostics. The inspector can load the final saved recipe into a fresh PVD case.
 
 Use the checkboxes, Ctrl-click, Shift-click, or **Select all** to compare samples. The comparison covers thickness profiles, growth and cleaning traces, process conditions, QCM, zone-model operating points, and morphology. Operating points share axes when they use the same diagram. SEM and Grains share a camera and grid scale across groups of up to four wafers. The Lightbox also compares up to four wafers at once with linked viewing controls. Use **Save selected** to download a titled JSON collection and **Reload saved wafers** to import it.
 

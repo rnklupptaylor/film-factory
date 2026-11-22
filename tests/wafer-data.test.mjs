@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MATERIALS, POSITIONS, advanceFilm, rates } from '../src/physics.mjs';
-import { VARIANTS, newSettings } from '../src/content.mjs';
+import { VARIANTS, newSettings, processConfig } from '../src/content.mjs';
 import { crystalFrequencyShift, crystalReading } from '../src/instruments.mjs';
 import { growthConditions, makeMorphology } from '../src/microstructure.mjs';
-import { readWaferFile, validWafer, waferCentre, waferFile, waferFilename, waferMaterialId, waferMorphologyReason } from '../src/wafer-data.mjs';
+import { readWaferFile, validWafer, waferCentre, waferClassification, waferFile, waferFilename, waferMaterialId, waferMorphologyReason } from '../src/wafer-data.mjs';
 import { waferGraphDomain, waferGraphRows } from '../src/wafer-graphs.mjs';
 
-function exampleWafer(variant = 'boat', symbol = VARIANTS[variant].materials[0]) {
-  const config = VARIANTS[variant];
-  const settings = newSettings(variant, symbol);
+function exampleWafer(variant = 'boat', symbol = VARIANTS[variant].materials[0], changes = {}) {
+  const config = processConfig(variant, symbol);
+  const settings = { ...newSettings(variant, symbol), ...changes };
   const material = MATERIALS[symbol];
   const sample = rates(config, settings, material);
   const duration = 60;
@@ -44,6 +44,56 @@ test('invalid recipes, malformed traces and foreign schema are rejected before i
   assert.throws(() => readWaferFile(JSON.stringify({ ...waferFile('Other', [wafer]), schema: 99 })), /valid Film Factory/);
 });
 
+test('new and previously saved wafers have the same technique, subtechnique and method', () => {
+  for (const [variant, subtechnique] of [['boat', 'Evaporation'], ['diode', 'Sputtering'], ['classic', 'Ion plating']]) {
+    const old = exampleWafer(variant);
+    const current = { ...old, technique: 'pvd' };
+    const { wafers } = readWaferFile(JSON.stringify(waferFile('Techniques', [old, current])));
+    for (const wafer of wafers) assert.deepEqual(waferClassification(wafer), {
+      technique: 'PVD', subtechnique, method: VARIANTS[variant].name,
+    });
+    assert.equal(validWafer({ ...old, technique: 'cvd' }), false);
+  }
+});
+
+test('older pulsed aluminium wafers receive compatible arcing controls when reloaded', () => {
+  const original = exampleWafer('pulsed', 'Al');
+  delete original.settings.oxygen;
+  delete original.settings.frequency;
+  const { wafers: [wafer] } = readWaferFile(JSON.stringify({ ...waferFile('Older wafers', [original]), schema: 1 }));
+  assert.equal(wafer.settings.oxygen, 0);
+  assert.equal(wafer.settings.frequency, 40);
+  assert.equal(wafer.recipes[0].settings.frequency, 40);
+  assert.deepEqual(wafer.profile, original.profile);
+});
+
+test('legacy sputtering recipes migrate to the four methods without changing the saved film or active gas', () => {
+  const cases = [
+    { old: 'dc', method: 'dc', target: 'Ti', gas: 'nitrogen', fraction: 0, film: 'Ti' },
+    { old: 'reactive', method: 'dc', target: 'Ti', gas: 'nitrogen', fraction: 6, film: 'TiN' },
+    { old: 'itoCeramic', method: 'pulsed', target: 'ITO', gas: 'oxygen', fraction: 1.5, film: 'ITO' },
+    { old: 'itoReactive', method: 'pulsed', target: 'InSn', gas: 'oxygen', fraction: 16, film: 'ITO' },
+  ];
+  for (const { old, method, target, gas, fraction, film } of cases) {
+    const pressure = gas === 'nitrogen' ? -1.4 : -2.65;
+    const original = exampleWafer(method, target, { pressure, [gas]: fraction });
+    assert.equal(original.film, film);
+    const settings = { ...original.settings };
+    delete settings.frequency;
+    if (old === 'dc') settings.nitrogen = 6;
+    const legacy = { ...original, variant: old, settings, recipes: [{ ...original.recipes[0], settings }] };
+    const reloaded = readWaferFile(JSON.stringify({ ...waferFile('Older wafers', [legacy]), schema: 1 }));
+    const [wafer] = reloaded.wafers;
+    assert.equal(wafer.variant, method);
+    assert.equal(wafer.settings[gas], fraction);
+    assert.equal(wafer.recipes[0].settings[gas], fraction);
+    assert.equal(wafer.film, film);
+    assert.deepEqual(wafer.profile, original.profile);
+    assert.deepEqual(waferGraphRows([wafer], gas, 'netRate')[0].x, fraction);
+    assert.deepEqual(readWaferFile(JSON.stringify(reloaded)), reloaded);
+  }
+});
+
 test('wafer export filenames are short and based on the collection title', () => {
   assert.equal(waferFilename('  Étude Ag / distance  '), 'wafers-etude-ag-distance.json');
   assert.ok(waferFilename('Very long series of thin film experiments for evaporation').length <= 40);
@@ -71,6 +121,21 @@ test('graph axes keep actual zero values distinct from quantities that do not ap
   const [bare] = waferGraphRows([{ ...evaporation, profile: POSITIONS.map(() => 0) }], 'centre', 'uniformity');
   assert.equal(bare.x, 0);
   assert.equal(bare.y, null);
+});
+
+test('electrical and direct ion settings round-trip with the correct comparison values', () => {
+  const electrical = exampleWafer('dc', 'Cu', { supplyMode: 'powerW', powerW: 120 });
+  const manual = exampleWafer('dc', 'Cu', { energy: 300, current: .35 });
+  const { wafers } = readWaferFile(JSON.stringify(waferFile('Electrical comparison', [electrical, manual])));
+  assert.deepEqual(wafers, [electrical, manual]);
+  const rows = waferGraphRows(wafers, 'power', 'perJoule');
+  assert.ok(Math.abs(rows[0].x - 120) < 1e-5 && rows[0].y > 0);
+  assert.deepEqual([rows[1].x, rows[1].y], [null, null]);
+  assert.equal(waferGraphRows(wafers, 'energy', 'current')[1].x, 300);
+  const old = readWaferFile(JSON.stringify({ ...waferFile('Old ion run', [manual]), schema: 2 }));
+  assert.deepEqual(old.wafers[0].settings, manual.settings);
+  assert.equal(validWafer({ ...electrical, settings: { ...electrical.settings, powerW: -80 } }), false);
+  assert.equal(validWafer({ ...electrical, variant: 'rf' }), false);
 });
 
 test('wafer graph domains handle one value and pressure decades without degeneracy', () => {

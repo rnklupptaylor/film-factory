@@ -37,7 +37,7 @@ export function exposedGrains(voxels, tops) {
 export function growthConditions(config, settings, sample) {
   const support = SUBSTRATES[settings.wafer] ?? SUBSTRATES.silicon;
   const refractoryNitride = sample.film.name === 'Titanium nitride';
-  const amorphous = sample.film.name === 'Silica';
+  const amorphous = sample.film.name === 'Silica' || sample.film.name === 'Alumina';
   const theta = sample.film.melting ? settings.substrate / sample.film.melting : null;
   // For compounds without a bulk melting point in the materials table, use
   // teaching proxies only in the mobility expression, not a displayed Tₛ/Tₘ.

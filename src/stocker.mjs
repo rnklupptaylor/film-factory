@@ -1,13 +1,14 @@
 import { MATERIALS, POSITIONS, rates } from './physics.mjs';
-import { SUBSTRATES, crystalFrequencyShift } from './instruments.mjs';
-import { VARIANTS, controlGroups } from './content.mjs';
+import { SUBSTRATES, crystalFrequencyShift, processGas } from './instruments.mjs';
+import { controlGroups, processConfig } from './content.mjs';
+import { supplyNames } from './discharge.mjs';
 import { chartMarkup, sci } from './graphics.mjs';
 import { makeMorphology } from './microstructure.mjs';
 import { FilmLightbox } from './lightbox.mjs';
 import { FilmMicroscope } from './microscope.mjs';
 import { groupZoneModels, zoneDiagramMarkup, zoneModel } from './zones.mjs';
 import { waferGraphAxes, waferGraphGroups, waferGraphRows, waferGraphDomain } from './wafer-graphs.mjs';
-import { LIGHTBOX_COMPARE_LIMIT, WAFER_FILE_BYTES, WAFER_FILE_COUNT, readWaferFile, waferFile, waferFilename, waferCentre, waferIsClean, waferHasMixedFilm, waferMorphologyReason, waferOverheated } from './wafer-data.mjs';
+import { LIGHTBOX_COMPARE_LIMIT, WAFER_FILE_BYTES, WAFER_FILE_COUNT, readWaferFile, waferFile, waferFilename, waferClassification, waferCentre, waferIsClean, waferHasMixedFilm, waferMorphologyReason, waferOverheated } from './wafer-data.mjs';
 
 const stockerStorage = 'film-factory-wafer-stocker-v1';
 const stockerEl = (id) => document.getElementById(id);
@@ -22,40 +23,52 @@ const stockerNum = (value, digits = 2) => value !== 0 && Math.abs(value) < 10 **
   ? sci(value, 1) : Number(value.toFixed(digits)).toString().replace('-', '−');
 const stockerUniformity = (wafer) => stockerCentre(wafer) > 0 ? 100 * wafer.profile[0] / stockerCentre(wafer) : null;
 const stockerLabel = (wafer) => `${wafer.profile.some((height) => height > 0) ? stockerMaterial(wafer.film) : 'Bare wafer'} · ${shortWafer(wafer)}`;
-const stockerSettings = (wafer, settings = wafer.settings) => controlGroups(VARIANTS[wafer.variant], MATERIALS[settings.symbol]).flat();
+const stockerSettings = (config, settings) => controlGroups(config, MATERIALS[settings.symbol], settings).flat();
 
 function stockerSettingValue(config, settings, key, unit) {
   const value = settings[key];
   if (key === 'pressure') return `${sci(10 ** value)} ${unit}`;
   if (key === 'bias' && !config.ibad && value !== 0) return `−${value} ${unit}`;
-  return `${stockerNum(value)} ${unit}`;
+  return `${stockerNum(value, key === 'dischargeA' ? 3 : 2)} ${unit}`;
 }
 
 function stockerSourceSettings(wafer) {
-  return controlGroups(VARIANTS[wafer.variant], MATERIALS[wafer.settings.symbol])[0].map(([key, , symbol, , , , unit]) =>
-    `${symbol} ${stockerSettingValue(VARIANTS[wafer.variant], wafer.settings, key, unit)}`).join(' · ');
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
+  return controlGroups(config, MATERIALS[wafer.settings.symbol], wafer.settings)[0].map(([key, , symbol, , , , unit]) =>
+    `${symbol} ${stockerSettingValue(config, wafer.settings, key, unit)}`).join(' · ');
 }
 
 function stockerRecipeMarkup(wafer) {
-  const config = VARIANTS[wafer.variant];
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
   let elapsed = 0;
-  const common = stockerSettings(wafer).map(([key, label, , , , , unit]) =>
+  const common = stockerSettings(config, wafer.settings).map(([key, label, , , , , unit]) =>
     `<div><dt>${label}</dt><dd>${stockerSettingValue(config, wafer.settings, key, unit)}</dd></div>`).join('');
   const steps = wafer.recipes.map(({ settings, duration, film }, index) => {
     const start = elapsed;
     elapsed += duration;
     const former = wafer.recipes[index - 1]?.settings;
-    const values = stockerSettings(wafer, settings).filter(([key]) => former?.[key] !== settings[key])
-      .map(([key, label, , , , , unit]) => `${label} ${stockerSettingValue(config, settings, key, unit)}`);
+    const stepConfig = processConfig(wafer.variant, settings.symbol);
+    const values = stockerSettings(stepConfig, settings).filter(([key]) => former?.[key] !== settings[key])
+      .map(([key, label, , , , , unit]) => `${label} ${stockerSettingValue(stepConfig, settings, key, unit)}`);
+    if (settings.supplyMode && settings.supplyMode !== former?.supplyMode) values.unshift(supplyNames[settings.supplyMode]);
     if (!former || former.preclean !== settings.preclean) values.unshift(settings.preclean ? 'Pre-clean' : 'Deposition');
     return `<li><strong>${stockerNum(start, 1)}–${stockerNum(elapsed, 1)} s</strong> · ${film ? stockerMaterial(film) : 'Coating source off'} · ${values.join(' · ')}</li>`;
   }).join('');
   return `<dl class="wafer-settings">${common}</dl><p>Source and Zone model use the final settings. Time plots show the saved stage. The steps below include any preceding stages retained on this wafer.</p><ol class="wafer-steps">${steps}</ol>`;
 }
 
+function stockerReactiveGas(wafer) {
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
+  if (config.arc) return 'N₂';
+  const gas = processGas(config, wafer.settings)?.species.find(([name, fraction]) => name !== 'Ar' && fraction > 0);
+  return gas ? `${gas[0]} · ${stockerNum(gas[1] * 100)}%` : '—';
+}
+
 const stockerColumns = [
   ['wafer', 'Wafer', stockerLabel],
-  ['variant', 'Method', (wafer) => VARIANTS[wafer.variant].name],
+  ['technique', 'Technique', (wafer) => waferClassification(wafer).technique],
+  ['subtechnique', 'Subtechnique', (wafer) => waferClassification(wafer).subtechnique],
+  ['variant', 'Method', (wafer) => waferClassification(wafer).method],
   ['target', 'Source / target', (wafer) => stockerMaterial(wafer.settings.symbol)],
   ['substrate', 'Substrate', (wafer) => SUBSTRATES[wafer.settings.wafer].name],
   ['mode', 'Mode', stockerMode],
@@ -65,8 +78,7 @@ const stockerColumns = [
   ['pressure', 'p (mbar)', (wafer) => 10 ** wafer.settings.pressure, (value) => sci(value)],
   ['gap', 'L (cm)', (wafer) => wafer.settings.distance],
   ['source', 'Source settings', stockerSourceSettings],
-  ['gas', 'Reactive gas', (wafer) => VARIANTS[wafer.variant].arc ? 'N₂' : VARIANTS[wafer.variant].reactive
-    ? `N₂ · ${wafer.settings.nitrogen}%` : VARIANTS[wafer.variant].ito ? `O₂ · ${wafer.settings.oxygen}%` : '—'],
+  ['gas', 'Reactive gas', stockerReactiveGas],
   ['created', 'Added', (wafer) => wafer.created, (value) => stockerDate.format(value)],
 ];
 
@@ -120,9 +132,11 @@ function compareWaferThickness(wafers) {
 }
 
 function compareWaferProcess(wafers) {
-  const models = wafers.map((wafer) => rates(VARIANTS[wafer.variant], wafer.settings, MATERIALS[wafer.settings.symbol]));
+  const models = wafers.map(({ variant, settings }) => rates(processConfig(variant, settings.symbol), settings, MATERIALS[settings.symbol]));
   const rows = [
-    ['Method', wafers.map((wafer) => VARIANTS[wafer.variant].name)],
+    ['Technique', wafers.map((wafer) => waferClassification(wafer).technique)],
+    ['Subtechnique', wafers.map((wafer) => waferClassification(wafer).subtechnique)],
+    ['Method', wafers.map((wafer) => waferClassification(wafer).method)],
     ['Substrate', wafers.map((wafer) => SUBSTRATES[wafer.settings.wafer].name)],
     ['Substrate temperature (K)', wafers.map((wafer) => wafer.settings.substrate)],
     ['Working pressure (mbar)', wafers.map((wafer) => sci(10 ** wafer.settings.pressure))],
@@ -135,6 +149,14 @@ function compareWaferProcess(wafers) {
     ['Tooling factor (%)', wafers.map((wafer) => wafer.qcm.tooling)],
   ];
   const notes = ['Rates and conditions describe each saved recipe at the end of the stage. QCM mass and frequency shift are cumulative.'];
+  if (models.some((model) => model.targetSupply)) {
+    rows.push(['Final average discharge power (W)', models.map(({ targetSupply }) => targetSupply ? stockerNum(targetSupply.power, 0) : '—')],
+      ['Final target voltage, on-state (V)', models.map(({ targetSupply }) => targetSupply ? stockerNum(-targetSupply.voltage, 0) : '—')],
+      ['Final average target ion current (A)', models.map(({ targetIonAverage }) => targetIonAverage === undefined ? '—' : stockerNum(targetIonAverage, 3))],
+      ['Final centre deposition per joule (nm/J)', models.map((model) => model.targetSupply?.power > 0
+        ? stockerNum(waferCentre(model.localGross) / model.targetSupply.power, 4) : '—')]);
+    notes.push('Deposition per joule uses the estimated power delivered to the discharge. Compare the same film material and source geometry.');
+  }
   if (wafers.some((wafer) => wafer.qcm.tooling !== wafers[0].qcm.tooling || wafer.film !== wafers[0].film || waferHasMixedFilm(wafer))) {
     notes.push('QCM indicated thickness depends on the tooling factor and coating density. Use the same factor and a single common film material, or compare the raw mass and frequency shift instead.');
   } else {
@@ -153,7 +175,7 @@ function compareWaferProcess(wafers) {
 
 function compareWaferZones(wafers) {
   const entries = wafers.map((wafer, index) => {
-    const config = VARIANTS[wafer.variant];
+    const config = processConfig(wafer.variant, wafer.settings.symbol);
     const sample = rates(config, wafer.settings, MATERIALS[wafer.settings.symbol]);
     return { wafer, model: zoneModel(config, wafer.settings, sample), label: index + 1, colour: stockerColours[index % stockerColours.length] };
   });
@@ -444,7 +466,8 @@ export class WaferStocker {
       waferOverheated(wafer) ? 'Above substrate thermal reference during the run' : '',
       this.version === wafer.version ? '' : `Saved with v${wafer.version}. Reconstructed views use the current model.`,
     ].filter(Boolean);
-    stockerEl('wafer-inspector-summary').textContent = [VARIANTS[wafer.variant].name, SUBSTRATES[wafer.settings.wafer].name,
+    const { technique, subtechnique, method } = waferClassification(wafer);
+    stockerEl('wafer-inspector-summary').textContent = [technique, subtechnique, method, SUBSTRATES[wafer.settings.wafer].name,
       `${wafer.duration} s ${stockerMode(wafer).toLowerCase()}`, ...warnings].join(' · ');
     stockerEl('wafer-recipe-body').innerHTML = stockerRecipeMarkup(wafer);
     stockerEl('wafer-inspector').showModal();

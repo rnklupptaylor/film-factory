@@ -79,8 +79,8 @@
           </svg>
         </div>
         <div class="mode-description">
-          <h2>Chemical vapour deposition (CVD)</h2>
-          <p>Film growth from gaseous precursors</p>
+          <h2>The Reaction Room (CVD)</h2>
+          <p>Chemical vapour deposition from gaseous precursors</p>
           <span class="mode-status">In development</span>
         </div>
       </a>
@@ -90,8 +90,8 @@
   <main id="cvd" class="cvd" hidden>
     <article class="cvd-placeholder">
       <a class="section-back" href="#home">← Main menu</a>
-      <h1 id="cvd-title" tabindex="-1">Chemical vapour deposition (CVD)</h1>
-      <p>The CVD simulator is in development. In CVD, gases carry the starting chemicals to the substrate, where reactions form a solid coating.</p>
+      <h1 id="cvd-title" tabindex="-1">The Reaction Room (CVD)</h1>
+      <p>The chemical vapour deposition simulator is in development. In CVD, gases carry the starting chemicals to the substrate, where reactions form a solid coating.</p>
       <p><a href="#theory/cvd">Read about CVD and how it relates to PVD</a></p>
     </article>
   </main>
@@ -115,13 +115,20 @@
     <div class="workspace" id="workspace" data-mobile="chamber">
       <section class="panel controls" aria-labelledby="controls-title">
         <div class="panel-header"><h2 id="controls-title">Process settings</h2><div class="control-actions"><button id="preclean" class="button" type="button" hidden>Pre-clean</button><button id="guide" class="button" type="button">Try it</button></div></div>
-        <div class="selects">
-          <label><span>Method</span><select id="variant" aria-label="Method"></select></label>
-          <label><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>
-          <label class="wafer-control"><span id="substrate-label">Substrate</span><select id="wafer" aria-labelledby="substrate-label" aria-describedby="substrate-limit"></select><span id="substrate-limit" class="wafer-limit"></span></label>
+        <div id="process-settings" class="process-settings">
+          <label class="setting-select method-control"><span>Method</span><select id="variant"></select></label>
+          <div id="pressure-control"></div>
+          <label class="setting-select"><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>
+          <fieldset class="source-settings">
+            <legend>Source parameters</legend>
+            <label id="supply-control" class="supply-control" hidden><span>Supply mode</span><select id="supply-mode" aria-describedby="supply-readout"></select></label>
+            <div id="source-sliders" class="source-sliders"></div>
+            <p id="supply-readout" class="supply-readout" hidden></p>
+          </fieldset>
+          <div id="distance-control"></div>
+          <label class="setting-select"><span id="substrate-label">Substrate</span><select id="wafer" aria-labelledby="substrate-label" aria-describedby="substrate-limit"></select><span id="substrate-limit" class="wafer-limit"></span></label>
+          <div id="substrate-temperature-control"></div>
         </div>
-        <nav class="seg control-nav" id="control-pages" aria-label="Setting groups"></nav>
-        <div id="sliders" class="sliders"></div>
         <p class="hardware-note" id="hardware-note"></p>
       </section>
       <section class="panel chamber" aria-labelledby="chamber-title">
@@ -241,6 +248,8 @@
 
   <script>
   'use strict';
+  %%ARCING.MJS%%
+%%DISCHARGE.MJS%%
   %%PHYSICS.MJS%%
   %%INSTRUMENTS.MJS%%
   %%CONTENT.MJS%%
