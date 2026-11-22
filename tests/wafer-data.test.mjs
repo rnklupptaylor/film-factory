@@ -3,8 +3,9 @@ import { test } from 'node:test';
 import { MATERIALS, POSITIONS, advanceFilm, rates } from '../src/physics.mjs';
 import { VARIANTS, newSettings } from '../src/content.mjs';
 import { crystalFrequencyShift, crystalReading } from '../src/instruments.mjs';
-import { growthConditions } from '../src/microstructure.mjs';
+import { growthConditions, makeMorphology } from '../src/microstructure.mjs';
 import { readWaferFile, validWafer, waferCentre, waferFile, waferFilename, waferMaterialId, waferMorphologyReason } from '../src/wafer-data.mjs';
+import { waferGraphDomain, waferGraphRows } from '../src/wafer-graphs.mjs';
 
 function exampleWafer(variant = 'boat', symbol = VARIANTS[variant].materials[0]) {
   const config = VARIANTS[variant];
@@ -60,4 +61,34 @@ test('film roughness comparison rejects bare, incomplete or incompatible surface
   assert.match(waferMorphologyReason([ag, ag], [surface, { ...surface, resolution: 3 }]), /resolution/);
   const overheated = { ...ag, recipes: [{ ...ag.recipes[0], settings: { ...ag.settings, wafer: 'polycarbonate', substrate: 450 } }] };
   assert.match(waferMorphologyReason([ag, overheated], [surface, surface]), /thermal reference/);
+});
+
+test('graph axes keep actual zero values distinct from quantities that do not apply', () => {
+  const evaporation = exampleWafer('boat');
+  const sputtering = exampleWafer('diode');
+  const [a, b] = waferGraphRows([evaporation, sputtering], 'temperature', 'energy');
+  assert.deepEqual([a.x, a.y, b.x, b.y], [evaporation.settings.temperature, null, null, sputtering.settings.energy]);
+  const [bare] = waferGraphRows([{ ...evaporation, profile: POSITIONS.map(() => 0) }], 'centre', 'uniformity');
+  assert.equal(bare.x, 0);
+  assert.equal(bare.y, null);
+});
+
+test('wafer graph domains handle one value and pressure decades without degeneracy', () => {
+  assert.deepEqual(waferGraphDomain([0, 0]), [0, 1]);
+  assert.deepEqual(waferGraphDomain([1e-6, 1e-2], true), [-6, -2]);
+  const samePressure = waferGraphDomain([1e-4, 1e-4], true);
+  assert.ok(samePressure[0] < -4 && samePressure[1] > -4);
+  assert.ok(waferGraphDomain([-10, -5])[1] < 0);
+});
+
+test('graph grain metrics match the microscopy model without building a mesh', () => {
+  const wafer = exampleWafer();
+  const summary = makeMorphology({ ...wafer.surface, summaryOnly: true, includeGrains: true });
+  const full = makeMorphology(wafer.surface);
+  assert.equal(summary.mesh, undefined);
+  assert.ok(full.grainCount > 0);
+  assert.equal(summary.grainCount, full.grainCount);
+  const [row] = waferGraphRows([wafer], 'roughness', 'grainDiameter', [summary]);
+  assert.equal(row.x, full.roughnessNm);
+  assert.equal(row.y, full.medianDiameter);
 });

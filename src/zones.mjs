@@ -1,5 +1,6 @@
 import { ITO_OXIDE_PA, TIN_NITROGEN_PA } from './physics.mjs';
 import { processGas, substrateStatus } from './instruments.mjs';
+import { labelledPointsMarkup } from './graphics.mjs';
 
 const MOVCHAN = ['Movchan–Demchishin', 'https://jglobal.jst.go.jp/en/detail?JGLOBAL_ID=200902029851583157'];
 const THORNTON = ['Thornton (1974)', 'https://doi.org/10.1116/1.1312732'];
@@ -249,26 +250,6 @@ export function groupZoneModels(entries) {
   return [...groups.values()];
 }
 
-function zoneComparisonMarkers(markers, position, right, top) {
-  const coincident = new Map();
-  for (const marker of markers) {
-    const [cx, cy] = position(marker.point);
-    const key = `${cx.toFixed(1)}:${cy.toFixed(1)}`;
-    if (!coincident.has(key)) coincident.set(key, { cx, cy, points: [] });
-    coincident.get(key).points.push(marker);
-  }
-  return [...coincident.values()].map(({ cx, cy, points }) => {
-    const symbols = points.slice(0, 3).map(({ colour }, i) =>
-      `<circle class="zone-comparison-point" cx="${cx}" cy="${cy}" r="${4 + 2.4 * i}" fill="${i ? 'none' : colour}" stroke="${i ? colour : 'var(--surface)'}"/>`).join('');
-    const leftOfPoint = cx > right - 28;
-    const number = points.length > 3 ? `${points.length} points` : points.map(({ label }) => label).join('/');
-    const label = markers.length <= 12
-      ? `<text class="zone-comparison-number" x="${cx + (leftOfPoint ? -9 : 9)}" y="${cy + (cy < top + 12 ? 13 : -7)}" text-anchor="${leftOfPoint ? 'end' : 'start'}">${number}</text>` : '';
-    const title = points.map(({ label, detail }) => `${label}. ${detail}`).join(' · ');
-    return `<g><title>${title}</title>${symbols}${label}</g>`;
-  }).join('');
-}
-
 export function zoneDiagramMarkup(model, markers) {
   const left = 64, right = 411, top = 18, bottom = 168;
   const x = axisPosition(model.x, left, right);
@@ -298,7 +279,7 @@ export function zoneDiagramMarkup(model, markers) {
       <text class="zone-tick" x="${left-7}" y="${py+4}" text-anchor="end">${value}</text>`;
   }).join('') : '';
   const [cx, cy] = position(model.point);
-  const tracer = markers ? zoneComparisonMarkers(markers, position, right, top)
+  const tracer = markers ? labelledPointsMarkup(markers, position, right, top)
     : `<path class="zone-cursor" d="M${cx} ${y ? top : 40}V${bottom}${y ? `M${left} ${cy}H${right}` : ''}"/>
     <circle class="zone-point-halo" cx="${cx}" cy="${cy}" r="8"/><circle class="zone-point" cx="${cx}" cy="${cy}" r="4.3"/>`;
   const description = markers ? `${markers.length} selected operating points. Coordinates and model readings follow the diagram.`

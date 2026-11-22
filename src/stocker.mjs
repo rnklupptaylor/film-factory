@@ -6,6 +6,7 @@ import { makeMorphology } from './microstructure.mjs';
 import { FilmLightbox } from './lightbox.mjs';
 import { FilmMicroscope } from './microscope.mjs';
 import { groupZoneModels, zoneDiagramMarkup, zoneModel } from './zones.mjs';
+import { waferGraphAxes, waferGraphGroups, waferGraphRows, waferGraphDomain } from './wafer-graphs.mjs';
 import { LIGHTBOX_COMPARE_LIMIT, WAFER_FILE_BYTES, WAFER_FILE_COUNT, readWaferFile, waferFile, waferFilename, waferCentre, waferIsClean, waferHasMixedFilm, waferMorphologyReason, waferOverheated } from './wafer-data.mjs';
 
 const stockerStorage = 'film-factory-wafer-stocker-v1';
@@ -186,6 +187,59 @@ function stockerSurfaceReadings(wafers, surfaces) {
   return stockerComparisonTable(wafers, rows) + (reason ? `<p class="stocker-note">${reason}</p>` : '');
 }
 
+function waferGraphOptions(selected) {
+  return waferGraphGroups.map(([group, axes]) => `<optgroup label="${group}">${Object.entries(axes).map(([id, axis]) =>
+    `<option value="${id}"${selected === id ? ' selected' : ''}>${axis.label}</option>`).join('')}</optgroup>`).join('');
+}
+
+function stockerGraphMarkup(wafers, xKey, yKey, surfaces) {
+  const x = waferGraphAxes[xKey];
+  const y = waferGraphAxes[yKey];
+  const axes = [xKey, yKey];
+  const format = (axis, value) => value === null ? '—' : axis.log ? sci(value, 3) : stockerNum(value, 3);
+  const rows = waferGraphRows(wafers, xKey, yKey, surfaces).map((row, i) => ({
+    ...row, index: i, label: i + 1, colour: stockerColours[i % stockerColours.length],
+  }));
+  const plotted = rows.filter((row) => row.x !== null && row.y !== null);
+  const chart = plotted.length ? chartMarkup({
+    title: 'Saved wafer measurements',
+    xLabel: `${x.label}${x.log ? ' · log scale' : ''}`,
+    yLabel: `${y.label}${y.log ? ' · log scale' : ''}`,
+    xDomain: waferGraphDomain(plotted.map((row) => row.x), x.log),
+    yDomain: waferGraphDomain(plotted.map((row) => row.y), y.log),
+    xLog: x.log, log: y.log,
+    dots: plotted.map((row) => ({
+      point: [x.log ? Math.log10(row.x) : row.x, y.log ? Math.log10(row.y) : row.y],
+      colour: row.colour, label: row.label,
+      detail: `${stockerLabel(row.wafer)} · x ${format(x, row.x)} · y ${format(y, row.y)}`,
+    })),
+  }) : '';
+  const notes = [];
+  if (plotted.length < rows.length) {
+    notes.push(`${plotted.length} of ${rows.length} wafers have both values. A dash marks an unavailable or inapplicable value.`);
+  }
+  if (axes.includes('roughness') && plotted.length > 1) {
+    const reason = waferMorphologyReason(plotted.map((row) => row.wafer), plotted.map((row) => surfaces[row.index]));
+    if (reason) notes.push(reason);
+  }
+  if (axes.some((key) => key === 'grainCount' || key === 'grainDiameter')) {
+    notes.push('Grain readings describe exposed crystalline regions on the model grid. The lateral scale is uncalibrated.');
+  }
+  const plottedWafers = plotted.map((row) => row.wafer);
+  if (axes.includes('qcmThickness') && plottedWafers.some((wafer) =>
+    wafer.qcm.tooling !== plottedWafers[0].qcm.tooling || wafer.film !== plottedWafers[0].film || waferHasMixedFilm(wafer))) {
+    notes.push('QCM indicated thickness depends on tooling and film density. Use areal mass or frequency shift to compare readings across different calibrations or materials.');
+  }
+  const plot = chart ? `<figure class="comparison-chart wafer-graph">
+    ${chart}<figcaption>One point per saved wafer. Settings use the final recorded recipe.</figcaption></figure>`
+    : '<p class="stocker-note">Choose another axis pair to plot these wafers.</p>';
+  return notes.map((note) => `<p class="stocker-note">${note}</p>`).join('') + plot
+    + `<div class="stocker-table-wrap comparison-table" tabindex="0" role="region" aria-label="Wafer graph values">
+      <table class="stocker-table"><thead><tr><th scope="col">Wafer</th><th scope="col">x · ${x.label}</th><th scope="col">y · ${y.label}</th></tr></thead>
+      <tbody>${rows.map((row) => `<tr><th scope="row"><span class="zone-legend-number" style="--series:${row.colour}">${row.label}</span> ${stockerLabel(row.wafer)}</th>
+        <td>${format(x, row.x)}</td><td>${format(y, row.y)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
 class WaferSurfaceQueue {
   constructor(workerCode) {
     try {
@@ -201,7 +255,7 @@ class WaferSurfaceQueue {
   }
 
   measure(surface, summaryOnly = true) {
-    this.input = { ...surface, summaryOnly };
+    this.input = { ...surface, summaryOnly, includeGrains: true };
     return new Promise((resolve) => {
       this.done = resolve;
       if (this.worker) this.worker.postMessage(this.input);
@@ -234,6 +288,7 @@ export class WaferStocker {
     this.surfaces = new WeakMap();
     this.lightboxes = [];
     this.microscopes = [];
+    this.graphAxes = { x: 'substrate', y: 'centre' };
     try {
       const saved = localStorage.getItem(stockerStorage);
       if (saved) this.wafers = readWaferFile(saved).wafers;
@@ -489,6 +544,10 @@ export class WaferStocker {
       body.innerHTML = compareWaferZones(wafers);
       return;
     }
+    if (tab === 'graphs') {
+      this.openGraphs(body, wafers);
+      return;
+    }
     if (tab === 'surface') {
       this.openMorphologyComparison(body, wafers);
       return;
@@ -516,6 +575,39 @@ export class WaferStocker {
       surfaces.push(surface);
     }
     return surfaces;
+  }
+
+  openGraphs(body, wafers) {
+    body.innerHTML = `<div class="wafer-graph-axes">
+      <label>Abscissa (x)<select data-wafer-axis="x">${waferGraphOptions(this.graphAxes.x)}</select></label>
+      <label>Ordinate (y)<select data-wafer-axis="y">${waferGraphOptions(this.graphAxes.y)}</select></label>
+    </div><div class="wafer-graph-body"></div>`;
+    const plot = body.querySelector('.wafer-graph-body');
+    body.querySelector('.wafer-graph-axes').addEventListener('change', (event) => {
+      this.graphAxes[event.target.dataset.waferAxis] = event.target.value;
+      this.renderGraph(plot, wafers);
+    });
+    this.renderGraph(plot, wafers);
+  }
+
+  async renderGraph(plot, wafers) {
+    this.clearComparison();
+    const { x, y } = this.graphAxes;
+    let surfaces = [];
+    if (waferGraphAxes[x].surface || waferGraphAxes[y].surface) {
+      if (wafers.every((wafer) => this.surfaces.has(wafer))) {
+        surfaces = wafers.map((wafer) => this.surfaces.get(wafer));
+      } else {
+        plot.innerHTML = '<p class="stocker-note" role="status">Calculating saved film surfaces…</p>';
+        const queue = new WaferSurfaceQueue(this.workerCode);
+        this.surfaceQueue = queue;
+        surfaces = await this.measureComparison(wafers, queue);
+        if (!surfaces || this.surfaceQueue !== queue) return;
+        queue.dispose();
+        this.surfaceQueue = undefined;
+      }
+    }
+    plot.innerHTML = stockerGraphMarkup(wafers, x, y, surfaces);
   }
 
   openMorphologyComparison(body, wafers) {

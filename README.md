@@ -29,6 +29,8 @@ Use **Add to Stocker** for any Preview or once a Growth run completes. The stock
 
 Use the checkboxes, Ctrl-click, Shift-click, or **Select all** to compare samples. The comparison covers thickness profiles, growth and cleaning traces, process conditions, QCM, zone-model operating points, and morphology. Operating points share axes when they use the same diagram. SEM and Grains share a camera and grid scale across groups of up to four wafers. The Lightbox also compares up to four wafers at once with linked viewing controls. Use **Save selected** to download a titled JSON collection and **Reload saved wafers** to import it.
 
+The **Graphs** tab plots one point per wafer. Choose any available process setting, film measurement, sensor reading, or morphology statistic for either axis. Working pressure uses a logarithmic scale. The table shows both values and identifies readings that do not apply to a wafer.
+
 ## Build and test
 
 Use Node.js 20 or later. No dependencies to install.

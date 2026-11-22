@@ -76,8 +76,8 @@ test('comparison marks show coincident operating points together and preserve th
   }));
   const plot = zoneDiagramMarkup(lower, markers);
   assert.match(plot, /3 selected operating points/);
-  assert.match(plot, /zone-comparison-number[^>]+>1\/2</);
-  assert.match(plot, /zone-comparison-number[^>]+>3</);
+  assert.match(plot, /comparison-point-number[^>]+>1\/2</);
+  assert.match(plot, /comparison-point-number[^>]+>3</);
   assert.match(plot, /Zone III/);
   assert.doesNotMatch(plot, /zone-point-halo|NaN|undefined/);
 });

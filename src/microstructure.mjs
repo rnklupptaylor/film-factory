@@ -313,8 +313,10 @@ export function surfaceMesh(model) {
   return packed;
 }
 
-export function makeMorphology({ segments, reference, summaryOnly = false }) {
+export function makeMorphology({ segments, reference, summaryOnly = false, includeGrains = false }) {
   const { voxels, tops, ...stats } = simulateMorphology(segments, reference);
-  if (summaryOnly) return stats;
-  return { ...stats, tops, ...exposedGrains(voxels, tops), mesh: surfaceMesh({ ...stats, voxels }) };
+  if (summaryOnly && !includeGrains) return stats;
+  const { grainMap, grainCount, medianDiameter } = exposedGrains(voxels, tops);
+  if (summaryOnly) return { ...stats, grainCount, medianDiameter };
+  return { ...stats, tops, grainMap, grainCount, medianDiameter, mesh: surfaceMesh({ ...stats, voxels }) };
 }
