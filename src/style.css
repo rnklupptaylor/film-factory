@@ -288,6 +288,8 @@ select {
 .zone-three { fill: #bb8b325c; }
 .zone-blend { fill: #87949b32; }
 .lightbox-view .view-reset { padding: .2rem .43rem; min-height: 28px; font-size: .76rem; white-space: nowrap; }
+.lightbox-mask[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
+.lightbox-view .model-toolbar { flex-wrap: wrap; }
 #film-lightbox { background: #232a31; }
 #film-lightbox[data-background="light"] { background: #e5ecef; }
 .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .25rem; }
@@ -578,7 +580,7 @@ dialog::backdrop { background: #0c1935a0; }
   .plot-nav button { min-height: 25px; padding: .12rem .19rem; font-size: .75rem; }
 }
 @container film-results (max-width: 455px) {
-  .lightbox-view .model-toolbar { gap: .18rem; flex-wrap: wrap; }
+  .lightbox-view .model-toolbar { gap: .18rem; }
   .lightbox-view .model-toolbar .seg button { padding-inline: .3rem; }
   .zone-tick { font-size: 13px; }
   .zone-axis-label { font-size: 14.5px; }

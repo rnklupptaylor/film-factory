@@ -960,6 +960,11 @@ el('lightbox-view').addEventListener('click', (event) => {
     pressed(el('lightbox-view'), 'light', light);
   }
 });
+el('lightbox-mask').addEventListener('click', (event) => {
+  const enabled = !lightbox.maskEnabled;
+  lightbox.setMaskEnabled(enabled);
+  event.currentTarget.setAttribute('aria-pressed', String(enabled));
+});
 el('lightbox-reset').addEventListener('click', () => lightbox.resetView());
 el('zone-notes').addEventListener('click', showZoneNotes);
 el('chamber-labels').addEventListener('click', (event) => {
