@@ -536,6 +536,7 @@ export class WaferStocker {
   compare(wafers) {
     if (wafers.length < 2) return;
     this.compared = wafers;
+    this.comparisonMaskEnabled = true;
     stockerEl('wafer-comparison-summary').textContent = `${wafers.length} selected wafers`;
     stockerEl('wafer-comparison').showModal();
     this.showComparison('thickness');
@@ -730,6 +731,7 @@ export class WaferStocker {
     body.innerHTML = `<div class="stocker-buttons comparison-light-tools">
       <label>Lighting <select data-compare-light="lighting"><option value="studio">Studio</option><option value="raking">Raking</option></select></label>
       <label>Background <select data-compare-light="background"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+      <button class="button lightbox-mask" type="button" data-compare-mask aria-pressed="${this.comparisonMaskEnabled}">FAU mask</button>
       <button class="button" type="button" data-compare-reset>Reset view</button></div>
       <p class="stocker-note">Drag or zoom any wafer to move all views together. Use the same background and lighting when judging the modelled finish.</p>
       <div class="comparison-lightboxes">${wafers.map((wafer) => `<figure><figcaption>${stockerLabel(wafer)}</figcaption>
@@ -739,7 +741,7 @@ export class WaferStocker {
     this.lightboxes = [...body.querySelectorAll('figure')].map((figure, index) => {
       const wafer = wafers[index];
       const viewer = new FilmLightbox(figure.querySelector('canvas'), figure.querySelector('p'), null, {
-        pixelLimit: 110000, shareCamera: (source) => {
+        maskEnabled: this.comparisonMaskEnabled, pixelLimit: 110000, shareCamera: (source) => {
           for (const other of this.lightboxes) if (other !== source) other.copyCamera(source);
         },
       });
@@ -752,6 +754,11 @@ export class WaferStocker {
     });
     body.querySelector('[data-compare-light="background"]').addEventListener('change', (event) => {
       for (const viewer of this.lightboxes) viewer.setBackground(event.target.value);
+    });
+    body.querySelector('[data-compare-mask]').addEventListener('click', (event) => {
+      this.comparisonMaskEnabled = !this.comparisonMaskEnabled;
+      event.currentTarget.setAttribute('aria-pressed', String(this.comparisonMaskEnabled));
+      for (const viewer of this.lightboxes) viewer.setMaskEnabled(this.comparisonMaskEnabled);
     });
     body.querySelector('[data-compare-reset]').addEventListener('click', () => this.lightboxes[0]?.resetView());
   }

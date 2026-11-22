@@ -43,6 +43,8 @@ test('lightbox supports wheel and pinch zoom while retaining single-pointer rota
     setPointerCapture() {},
   };
   const view = new FilmLightbox(canvas, {}, '');
+  assert.equal(view.maskEnabled, true);
+  view.setMaskEnabled(false);
   const emit = (type, event) => listeners.get(type)(event);
   const pointer = (pointerId, clientX) => ({ pointerId, clientX, clientY: 0, button: 0 });
   let wheelHandled = false;
@@ -65,4 +67,5 @@ test('lightbox supports wheel and pinch zoom while retaining single-pointer rota
   view.resetView();
   assert.equal(view.zoom, 1);
   assert.deepEqual(view.angles, angles);
+  assert.equal(view.maskEnabled, false);
 });

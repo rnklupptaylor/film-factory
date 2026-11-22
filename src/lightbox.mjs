@@ -11,6 +11,35 @@ const SUBSTRATE_FINISH = {
 };
 const TRANSPARENT_FILMS = new Set(['Indium tin oxide', 'Silica', 'Alumina']);
 
+// Contours and tight bounds of the supplied FAU wordmark, in SVG units.
+const FAU_WORDMARK = `M48.719,66.643l9.744-9.744  v176.95h-9.744V66.643z M77.95,58.462h116.925v-9.743H68.207v116.925h107.622v-9.744H77.95V58.462z M190.5,136.412H97.438V97.437  h79.588l9.744-9.744H97.438V77.95h97.438v-9.744H87.694v77.95h93.19L190.5,136.412z M68.207,233.85h9.743v-48.719h9.744v40.538  l9.743-9.744v-30.794h78.392v-9.744H68.207V233.85z M542.599,48.719v112.053c0,26.074-11.634,48.475-38.78,65.656l-0.219-0.287  c17.838-14.146,29.256-32.316,29.256-55.788V48.719h-9.744V170.19c0,34.979-28.356,61.223-63.334,61.223  s-63.334-26.244-63.334-61.223V56.899l-9.744,9.744v103.71c0,40.36,32.718,70.642,73.078,70.642c0.934,0,9.744,0,9.744,0  c39.742,0,82.821-29.35,82.821-80.08c0-0.048,0-112.196,0-112.196H542.599z M459.777,221.67c29.58,0,53.562-21.908,53.59-51.48l0,0  V56.899l-9.743,9.744v94.129c0,18.834-15.269,31.667-34.103,31.667c-18.834,0-34.103-12.833-34.103-31.667V48.719h-9.744v112.053  c0,24.216,19.631,41.411,43.847,41.411c9.902,0,21.922-4.892,30.085-13.503l0.22,0.287c-7.654,14.195-21.804,22.96-40.048,22.96  c-24.068,0-43.604-17.424-43.842-41.411h-0.005V48.719h-9.744v121.796h0.005C406.393,199.922,430.306,221.67,459.777,221.67z   M243.258,175.387l-24.64,58.463l9.745-0.001l-0.001,0.001h0.001l12.319-29.231h82.554l12.309,29.231h9.743l-16.41-38.976h-84.089  l4.106-9.743h85.624l20.513,48.719h9.743l-24.615-58.463H243.258z M257.595,48.719l-71.61,169.857l6.202,8.42l75.151-178.277  H257.595z M296.57,48.719l75.058,178.277l6.186-8.42L306.313,48.719H296.57z M237.601,165.643l-28.818,68.206h-9.743l73.17-173.562  l40.258,95.612h9.744L277.082,48.719h9.744l49.231,116.925H237.601z M281.978,106.629l-20.764,49.27h41.509L281.978,106.629z   M241.702,155.899h9.769l25.639-60.835l-4.879-11.588L241.702,155.899z`;
+const FAU_MASK_WIDTH = .75;
+let lightboxMask;
+let lightboxMaskCanvas;
+
+function lightboxMaskPath() {
+  if (!lightboxMask) {
+    const scale = 2 * FAU_MASK_WIDTH / (552.343 - 48.719);
+    lightboxMask = new Path2D();
+    lightboxMask.addPath(new Path2D(FAU_WORDMARK), {
+      a: scale, d: scale, e: -scale * (48.719 + 552.343) / 2, f: -scale * (48.719 + 240.995) / 2,
+    });
+  }
+  return lightboxMask;
+}
+
+function lightboxMaskImage() {
+  if (!lightboxMaskCanvas) {
+    lightboxMaskCanvas = document.createElement('canvas');
+    lightboxMaskCanvas.width = lightboxMaskCanvas.height = 512;
+    const half = lightboxMaskCanvas.width / 2;
+    const ctx = lightboxMaskCanvas.getContext('2d');
+    ctx.setTransform(half, 0, 0, half, half, half);
+    ctx.fill(lightboxMaskPath());
+  }
+  return lightboxMaskCanvas;
+}
+
 export function lightboxFilmAppearance(profile, model) {
   const centre = Math.floor(profile.length / 2);
   const peak = Math.max(...profile);
@@ -45,6 +74,8 @@ precision mediump float;
 uniform vec2 viewport;
 uniform vec4 rotation;
 uniform sampler2D profileMap;
+uniform sampler2D maskMap;
+uniform float maskEnabled;
 uniform vec2 profileRange;
 uniform vec4 filmFinish;
 uniform vec4 baseFinish;
@@ -149,6 +180,10 @@ void main() {
   float metal = filmFinish.a;
   float opacity = (1.-exp(-thickness/mix(13.,6.,metal))) * (1.-pinhole);
   if (!top) opacity = 0.;
+  else if (maskEnabled > .5) {
+    // Wafer-local coordinates keep the uncoated area attached to the surface.
+    opacity *= 1. - texture2D(maskMap, .5 + .5*vec2(point.x, -point.y)).a;
+  }
   float localRoughness = mix(substrateRoughness, min(.98,rough + .22*pit), opacity);
   vec3 tint = mix(baseFinish.rgb, filmFinish.rgb, opacity*mix(.20,1.,metal));
   float metallic = mix(baseFinish.a, metal, opacity);
@@ -206,6 +241,16 @@ function lightboxGL(canvas) {
   const position = gl.getAttribLocation(program, 'position');
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, lightboxMaskImage());
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.uniform1i(gl.getUniformLocation(program, 'maskMap'), 1);
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -213,7 +258,7 @@ function lightboxGL(canvas) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const uniforms = ['viewport','rotation','profileRange','filmFinish','baseFinish','substrateRoughness',
-    'filmState','raking','lightBackground','baseTransmission','zoom'];
+    'filmState','raking','lightBackground','baseTransmission','zoom','maskEnabled'];
   return { gl, uniform: Object.fromEntries(uniforms.map(name => [name, gl.getUniformLocation(program, name)])) };
 }
 
@@ -229,7 +274,7 @@ function pointerSpan(pointers) {
 }
 
 export class FilmLightbox {
-  constructor(canvas, status, workerCode, { shareCamera, pixelLimit } = {}) {
+  constructor(canvas, status, workerCode, { shareCamera, pixelLimit, maskEnabled = true } = {}) {
     this.canvas = canvas;
     this.status = status;
     this.gpu = lightboxGL(canvas);
@@ -237,6 +282,7 @@ export class FilmLightbox {
     this.worker = null;
     this.lighting = 'studio';
     this.background = 'dark';
+    this.maskEnabled = maskEnabled;
     this.pointers = new Map();
     this.frame = 0;
     this.resetView();
@@ -393,6 +439,11 @@ export class FilmLightbox {
     this.schedule();
   }
 
+  setMaskEnabled(enabled) {
+    this.maskEnabled = enabled;
+    this.schedule();
+  }
+
   schedule() {
     if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.draw(); });
   }
@@ -416,6 +467,7 @@ export class FilmLightbox {
     gl.uniform1f(uniform.raking, Number(this.lighting === 'raking'));
     gl.uniform1f(uniform.lightBackground, Number(this.background === 'light'));
     gl.uniform1f(uniform.zoom, this.zoom);
+    gl.uniform1f(uniform.maskEnabled, Number(this.maskEnabled && !appearance.bare));
     gl.drawArrays(gl.TRIANGLES,0,3);
   }
 
@@ -445,16 +497,27 @@ export class FilmLightbox {
     highlight.addColorStop(centre,`rgba(255,255,255,${.23 + .60*gloss})`);
     highlight.addColorStop(Math.min(.98,centre+spread),colour);
     highlight.addColorStop(1,colour);
-    ctx.fillStyle = highlight;
     ctx.strokeStyle = '#b7c8d1';
     ctx.lineWidth = Math.max(1,radius*.025);
-    ctx.beginPath();
-    ctx.arc(0,0,radius,0,Math.PI*2);
+    const disk = new Path2D();
+    disk.arc(0, 0, radius, 0, Math.PI * 2);
     const opaqueCoating = this.transparentFilm ? 0 : this.appearance.coverage * -Math.expm1(-this.appearance.peak / 6);
+    const masked = this.maskEnabled && roundness > 0 && !this.appearance.bare;
+    if (masked) {
+      const bareArea = new Path2D();
+      bareArea.addPath(lightboxMaskPath(), { a: radius, d: radius });
+      ctx.fillStyle = this.substrateColour;
+      ctx.globalAlpha = 1 - this.transmission * .78;
+      ctx.fill(bareArea);
+      const coatedArea = new Path2D(bareArea);
+      coatedArea.addPath(disk);
+      ctx.save();
+      ctx.clip(coatedArea, 'evenodd');
+    }
+    ctx.fillStyle = highlight;
     ctx.globalAlpha = 1 - this.transmission * (1 - (roundness > 0 ? opaqueCoating : 0)) * .78;
-    ctx.fill();
+    ctx.fill(disk);
     ctx.globalAlpha = 1;
-    ctx.stroke();
     if (roundness > 0 && !this.appearance.bare) {
       const flaws = Math.round(100 * (1 - this.appearance.coverage + this.appearance.voidFraction));
       ctx.fillStyle = '#28333a90';
@@ -466,6 +529,9 @@ export class FilmLightbox {
         ctx.fill();
       }
     }
+    if (masked) ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.stroke(disk);
     ctx.restore();
   }
 }
