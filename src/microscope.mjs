@@ -105,7 +105,7 @@ function paintGrainMap(ctx, model, width, height, fill = .88) {
 }
 
 export class FilmMicroscope {
-  constructor(canvas, status, workerCode) {
+  constructor(canvas, status, workerCode, { shareCamera, scaleHeight, pixelLimit } = {}) {
     this.canvas = canvas;
     this.status = status;
     this.style = 'sem';
@@ -117,7 +117,11 @@ export class FilmMicroscope {
     this.ctx = this.gpu ? null : canvas.getContext('2d');
     this.model = null;
     this.worker = null;
-    try {
+    this.shareCamera = shareCamera;
+    this.scaleHeight = scaleHeight;
+    this.pixelLimit = pixelLimit;
+    this.frame = 0;
+    if (workerCode) try {
       const url = URL.createObjectURL(new Blob([workerCode], {type:'text/javascript'}));
       try { this.worker = new Worker(url); } finally { URL.revokeObjectURL(url); }
       this.worker.onmessage = ({ data }) => this.display(data);
@@ -129,7 +133,8 @@ export class FilmMicroscope {
         if (request) this.dispatch(request);
       };
     } catch { /* The same kernel can run in the page for offline restrictions. */ }
-    new ResizeObserver(() => this.draw()).observe(canvas);
+    this.resizeObserver = new ResizeObserver(() => this.scheduleDraw());
+    this.resizeObserver.observe(canvas);
     canvas.addEventListener('pointerdown', (event) => {
       if (!this.gpu) return;
       this.drag = [event.clientX, event.clientY];
@@ -153,12 +158,38 @@ export class FilmMicroscope {
   rotate(yaw, pitch) {
     this.rotation[0] += yaw;
     this.rotation[1] = Math.max(.03, Math.min(1.33, this.rotation[1] + pitch));
-    this.draw();
+    this.cameraChanged();
   }
 
   setView(view) {
     this.rotation = view === 'top' ? [0,.03] : [-.61,.83];
-    this.draw();
+    this.cameraChanged();
+  }
+
+  cameraChanged() {
+    this.scheduleDraw();
+    this.shareCamera?.(this);
+  }
+
+  copyCamera(source) {
+    this.rotation = [...source.rotation];
+    this.scheduleDraw();
+  }
+
+  scheduleDraw() {
+    if (!this.pixelLimit) {
+      this.draw();
+    } else if (!this.frame) {
+      this.frame = requestAnimationFrame(() => { this.frame = 0; this.draw(); });
+    }
+  }
+
+  dispose() {
+    this.resizeObserver.disconnect();
+    this.worker?.terminate();
+    cancelAnimationFrame(this.frame);
+    clearTimeout(this.fallback);
+    this.gpu?.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
   setStyle(style) {
@@ -166,7 +197,7 @@ export class FilmMicroscope {
     this.style = style;
     if (!this.model) return;
     this.updateReadout();
-    this.draw();
+    this.scheduleDraw();
   }
 
   request(key, segments, reference) {
@@ -181,7 +212,7 @@ export class FilmMicroscope {
     this.active = request;
     this.busy = true;
     if (this.worker) this.worker.postMessage(request);
-    else setTimeout(() => this.display(makeMorphology(request)), 0);
+    else this.fallback = setTimeout(() => this.display(makeMorphology(request)), 0);
   }
 
   display(model) {
@@ -192,7 +223,7 @@ export class FilmMicroscope {
       gl.bufferData(gl.ARRAY_BUFFER, model.mesh, gl.DYNAMIC_DRAW);
     }
     this.updateReadout();
-    this.draw();
+    this.scheduleDraw();
     if (this.next) {
       const request = this.next;
       this.next = undefined;
@@ -205,7 +236,7 @@ export class FilmMicroscope {
     const grains = this.style === 'grains';
     const shape = grains ? (model.grainCount
       ? `${model.grainCount} exposed grains · median diameter ${model.medianDiameter.toFixed(1)} cells`
-      : 'Amorphous film')
+      : 'No exposed crystalline grains')
       : `${Math.round(model.coverage * 100)}% area covered · ${Math.round(model.voidFraction * 100)}% voids in envelope`;
     const roughness = model.roughnessNm > 0 && model.roughnessNm < .1 ? '&lt; 0.1' : `≈ ${model.roughnessNm.toFixed(1)}`;
     this.status.innerHTML = model.count
@@ -218,7 +249,8 @@ export class FilmMicroscope {
 
   draw() {
     if (!this.model || !this.canvas.clientWidth || !this.canvas.clientHeight) return;
-    const density = Math.min(2, devicePixelRatio);
+    const density = Math.min(2, devicePixelRatio,
+      Math.sqrt((this.pixelLimit ?? Infinity) / (this.canvas.clientWidth * this.canvas.clientHeight)));
     const w = Math.round(this.canvas.clientWidth * density);
     const h = Math.round(this.canvas.clientHeight * density);
     if (this.canvas.width !== w) this.canvas.width = w;
@@ -228,7 +260,7 @@ export class FilmMicroscope {
     const { size, highest, mesh } = this.model;
     const [yaw,pitch] = this.rotation;
     const spanX = size * (Math.abs(Math.cos(yaw)) + Math.abs(Math.sin(yaw)));
-    const spanY = spanX * Math.cos(pitch) + (highest + 3) * Math.sin(pitch);
+    const spanY = spanX * Math.cos(pitch) + ((this.scaleHeight ?? highest) + 3) * Math.sin(pitch);
     const unit = 1.69 * Math.min(w / spanX, h / spanY);
     gl.viewport(0,0,w,h);
     gl.clearColor(.078,.087,.10,1);

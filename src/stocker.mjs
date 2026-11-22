@@ -4,12 +4,15 @@ import { VARIANTS, controlGroups } from './content.mjs';
 import { chartMarkup, sci } from './graphics.mjs';
 import { makeMorphology } from './microstructure.mjs';
 import { FilmLightbox } from './lightbox.mjs';
+import { FilmMicroscope } from './microscope.mjs';
+import { groupZoneModels, zoneDiagramMarkup, zoneModel } from './zones.mjs';
 import { LIGHTBOX_COMPARE_LIMIT, WAFER_FILE_BYTES, WAFER_FILE_COUNT, readWaferFile, waferFile, waferFilename, waferCentre, waferIsClean, waferHasMixedFilm, waferMorphologyReason, waferOverheated } from './wafer-data.mjs';
 
 const stockerStorage = 'film-factory-wafer-stocker-v1';
 const stockerEl = (id) => document.getElementById(id);
 const stockerDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const stockerColours = ['#408cef', '#e16e9d', '#36a580', '#e6984c', '#9d83df', '#8b9b37', '#c56f58', '#459da9'];
+const morphologyPageSize = 4;
 const shortWafer = (wafer) => wafer.id.slice(-5).toUpperCase();
 const stockerMaterial = (key) => MATERIALS[key].formula ?? MATERIALS[key].name;
 const stockerMode = (wafer) => `${wafer.mode === 'preview' ? 'Preview' : 'Growth'}${waferIsClean(wafer) ? ' · Pre-clean' : ''}`;
@@ -147,6 +150,42 @@ function compareWaferProcess(wafers) {
   return notes.map((note) => `<p class="stocker-note">${note}</p>`).join('') + stockerComparisonTable(wafers, rows);
 }
 
+function compareWaferZones(wafers) {
+  const entries = wafers.map((wafer, index) => {
+    const config = VARIANTS[wafer.variant];
+    const sample = rates(config, wafer.settings, MATERIALS[wafer.settings.symbol]);
+    return { wafer, model: zoneModel(config, wafer.settings, sample), label: index + 1, colour: stockerColours[index % stockerColours.length] };
+  });
+  const groups = groupZoneModels(entries);
+  const charts = groups.map((group) => {
+    const model = group[0].model;
+    const title = group.every((entry) => entry.model.name === model.name) ? model.name : 'Anders · ion-assistance projection';
+    const markers = group.map(({ wafer, model, label, colour }) => ({
+      point: model.point, label, colour, detail: `${stockerLabel(wafer)} · ${model.operating}`,
+    }));
+    return `<figure class="comparison-chart"><figcaption>${title}</figcaption>
+      ${zoneDiagramMarkup({ ...model, name: title }, markers)}
+      <ul class="comparison-zone-points" aria-label="Operating points">${group.map(({ wafer, model, label, colour }) =>
+      `<li><span class="zone-legend-number" style="--series:${colour}">${label}</span>
+        <div><strong>${stockerLabel(wafer)}</strong><span>${model.operating}</span><span>${model.reading}</span>
+        <small>${model.detail} ${model.hot ? model.context : ''}</small></div></li>`).join('')}</ul></figure>`;
+  }).join('');
+  const scope = groups.length > 1 ? ' The selected recipes use different models or study ranges, so their points are grouped on separate diagrams.' : '';
+  return `<p class="stocker-note">Points use each wafer’s final recorded settings. Coincident points share a marker.${scope}</p>
+    <div class="comparison-charts comparison-zone-charts">${charts}</div>`;
+}
+
+function stockerSurfaceReadings(wafers, surfaces) {
+  const reason = waferMorphologyReason(wafers, surfaces);
+  const rows = [
+    ['Modelled area covered (%)', surfaces.map((surface) => stockerNum(surface.coverage * 100, 1))],
+    ['Voids in film envelope (%)', surfaces.map((surface) => !surface.count ? 'Bare' : stockerNum(surface.voidFraction * 100, 1))],
+    ['Vertical model cell (nm)', surfaces.map((surface) => stockerNum(surface.resolution))],
+  ];
+  if (!reason) rows.push(['Modelled RMS roughness S<sub>q</sub> (nm)', surfaces.map((surface) => stockerNum(surface.roughnessNm))]);
+  return stockerComparisonTable(wafers, rows) + (reason ? `<p class="stocker-note">${reason}</p>` : '');
+}
+
 class WaferSurfaceQueue {
   constructor(workerCode) {
     try {
@@ -161,8 +200,8 @@ class WaferSurfaceQueue {
     } catch { /* Local fallback uses the same deposition model. */ }
   }
 
-  measure(surface) {
-    this.input = { ...surface, summaryOnly: true };
+  measure(surface, summaryOnly = true) {
+    this.input = { ...surface, summaryOnly };
     return new Promise((resolve) => {
       this.done = resolve;
       if (this.worker) this.worker.postMessage(this.input);
@@ -194,6 +233,7 @@ export class WaferStocker {
     this.sort = { key: 'created', direction: -1 };
     this.surfaces = new WeakMap();
     this.lightboxes = [];
+    this.microscopes = [];
     try {
       const saved = localStorage.getItem(stockerStorage);
       if (saved) this.wafers = readWaferFile(saved).wafers;
@@ -428,6 +468,8 @@ export class WaferStocker {
     this.surfaceQueue = undefined;
     for (const viewer of this.lightboxes) viewer.dispose();
     this.lightboxes = [];
+    for (const viewer of this.microscopes) viewer.dispose();
+    this.microscopes = [];
   }
 
   async showComparison(tab) {
@@ -443,13 +485,29 @@ export class WaferStocker {
       body.innerHTML = tab === 'thickness' ? compareWaferThickness(wafers) : compareWaferProcess(wafers);
       return;
     }
-    if (tab === 'lightbox' && wafers.length > LIGHTBOX_COMPARE_LIMIT) {
+    if (tab === 'zones') {
+      body.innerHTML = compareWaferZones(wafers);
+      return;
+    }
+    if (tab === 'surface') {
+      this.openMorphologyComparison(body, wafers);
+      return;
+    }
+    if (wafers.length > LIGHTBOX_COMPARE_LIMIT) {
       body.innerHTML = `<p class="stocker-note">Select 2–${LIGHTBOX_COMPARE_LIMIT} wafers for a responsive Lightbox comparison. The other comparison views include all selected wafers.</p>`;
       return;
     }
     body.innerHTML = '<p class="stocker-note" role="status">Calculating saved film surfaces…</p>';
     const queue = new WaferSurfaceQueue(this.workerCode);
     this.surfaceQueue = queue;
+    const surfaces = await this.measureComparison(wafers, queue);
+    if (!surfaces || this.surfaceQueue !== queue) return;
+    queue.dispose();
+    this.surfaceQueue = undefined;
+    this.renderLightboxes(body, wafers, surfaces);
+  }
+
+  async measureComparison(wafers, queue) {
     const surfaces = [];
     for (const wafer of wafers) {
       const surface = this.surfaces.get(wafer) ?? await queue.measure(wafer.surface);
@@ -457,22 +515,100 @@ export class WaferStocker {
       this.surfaces.set(wafer, surface);
       surfaces.push(surface);
     }
+    return surfaces;
+  }
+
+  openMorphologyComparison(body, wafers) {
+    this.microscopeStyle = 'sem';
+    this.microscopeView = 'tilt';
+    const groups = Math.ceil(wafers.length / morphologyPageSize);
+    const selector = groups > 1 ? `<label class="morphology-group">Wafer group <select data-morphology-group>
+      ${Array.from({ length: groups }, (_, index) => {
+        const first = index * morphologyPageSize + 1;
+        const last = Math.min(first + morphologyPageSize - 1, wafers.length);
+        return `<option value="${index}">${first === last ? first : `${first}–${last}`} of ${wafers.length}</option>`;
+      }).join('')}</select></label>` : '';
+    body.innerHTML = `<div class="stocker-buttons comparison-morph-tools">
+      <nav class="seg" aria-label="Morphology appearance">
+        <button type="button" data-morph-style="sem" aria-pressed="true">SEM</button>
+        <button type="button" data-morph-style="grains" aria-pressed="false">Grains</button>
+      </nav>
+      <nav class="seg" aria-label="Morphology view">
+        <button type="button" data-morph-view="tilt">Tilt</button>
+        <button type="button" data-morph-view="top">Top</button>
+      </nav>
+      ${selector}</div>
+      <p class="stocker-note">Drag any view to rotate all wafers in its group at the same grid scale. Grain colours are local to each wafer. Dimensions are in model cells.</p>
+      <div id="comparison-microscopes"></div>
+      <div id="comparison-morphology-readings" class="comparison-morphology-readings"></div>`;
+    const tools = body.querySelector('.comparison-morph-tools');
+    tools.addEventListener('click', (event) => {
+      const { morphStyle, morphView } = event.target.dataset;
+      if (morphStyle) {
+        this.microscopeStyle = morphStyle;
+        for (const button of tools.querySelectorAll('[data-morph-style]')) {
+          button.setAttribute('aria-pressed', String(morphStyle === button.dataset.morphStyle));
+        }
+        for (const viewer of this.microscopes) viewer.setStyle(morphStyle);
+      } else if (morphView) {
+        this.microscopeView = morphView;
+        this.microscopes[0]?.setView(morphView);
+      }
+    });
+    tools.querySelector('[data-morphology-group]')?.addEventListener('change', (event) =>
+      this.renderMicroscopeGroup(wafers, Number(event.target.value)));
+    this.renderMicroscopeGroup(wafers, 0);
+  }
+
+  async renderMicroscopeGroup(wafers, page) {
+    this.clearComparison();
+    const start = page * morphologyPageSize;
+    const group = wafers.slice(start, start + morphologyPageSize);
+    const stage = stockerEl('comparison-microscopes');
+    const readings = stockerEl('comparison-morphology-readings');
+    stage.innerHTML = '<p class="stocker-note" role="status">Reconstructing saved micrographs…</p>';
+    const queue = new WaferSurfaceQueue(this.workerCode);
+    this.surfaceQueue = queue;
+    const models = [];
+    for (const wafer of group) {
+      const model = await queue.measure(wafer.surface, false);
+      if (this.surfaceQueue !== queue || !model) return;
+      models.push(model);
+      const { mesh, tops, grainMap, ...stats } = model;
+      this.surfaces.set(wafer, stats);
+    }
+    this.renderMicroscopes(stage, group, models);
+    if (!readings.hasChildNodes()) readings.innerHTML = '<p class="stocker-note" role="status">Calculating comparison measurements…</p>';
+    const surfaces = await this.measureComparison(wafers, queue);
+    if (this.surfaceQueue !== queue || !surfaces) return;
     queue.dispose();
     this.surfaceQueue = undefined;
-    if (tab === 'lightbox') {
-      this.renderLightboxes(body, wafers, surfaces);
-      return;
+    readings.innerHTML = stockerSurfaceReadings(wafers, surfaces);
+  }
+
+  renderMicroscopes(stage, group, models) {
+    stage.innerHTML = `<div class="comparison-microscopes">${group.map((wafer) =>
+      `<figure><figcaption>${stockerLabel(wafer)}</figcaption>
+        <canvas tabindex="0" role="img"></canvas><p class="instrument-note"></p></figure>`).join('')}</div>`;
+    const scaleHeight = Math.max(...models.map(({ highest }) => highest));
+    this.microscopes = [...stage.querySelectorAll('figure')].map((figure, index) => {
+      const viewer = new FilmMicroscope(figure.querySelector('canvas'), figure.querySelector('p'), null, {
+        scaleHeight, pixelLimit: 135000, shareCamera: (source) => {
+          for (const other of this.microscopes) if (other !== source) other.copyCamera(source);
+        },
+      });
+      viewer.setStyle(this.microscopeStyle);
+      viewer.setView(this.microscopeView);
+      viewer.display(models[index]);
+      return viewer;
+    });
+    const hasTilt = this.microscopes.some((viewer) => viewer.gpu);
+    for (const button of stage.parentElement.querySelectorAll('[data-morph-view]')) {
+      button.disabled = !hasTilt;
     }
-    const reason = waferMorphologyReason(wafers, surfaces);
-    const rows = [
-      ['Modelled area covered (%)', surfaces.map((surface) => stockerNum(surface.coverage * 100, 1))],
-      ['Voids in film envelope (%)', surfaces.map((surface) => !surface.count ? 'Bare' : stockerNum(surface.voidFraction * 100, 1))],
-      ['Vertical model cell (nm)', surfaces.map((surface) => stockerNum(surface.resolution))],
-    ];
-    if (!reason) rows.push(['Modelled RMS roughness S<sub>q</sub> (nm)', surfaces.map((surface) => stockerNum(surface.roughnessNm))]);
-    body.innerHTML = stockerComparisonTable(wafers, rows)
-      + (reason ? `<p class="stocker-note">${reason}</p>` : '')
-      + '<p class="stocker-note">Grain dimensions are shown in simulation cells for individual wafers. The model has no calibrated lateral scale for comparing physical grain sizes.</p>';
+    if (this.microscopes.some((viewer) => !viewer.gpu)) {
+      stage.insertAdjacentHTML('beforeend', '<p class="stocker-note">Top-view maps are shown wherever WebGL is unavailable. Rotation applies to the 3D views.</p>');
+    }
   }
 
   renderLightboxes(body, wafers, surfaces) {

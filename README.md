@@ -27,7 +27,7 @@ The Theory page introduces the deposition methods, explains the plots and instru
 
 Use **Add to Stocker** for any Preview or once a Growth run completes. The stocker keeps the recipe, recorded process changes, and film results in this browser. Double-click a row or choose **Inspect wafer** to reopen its Film & Diagnostics. The inspector can load the final saved recipe into a fresh PVD case.
 
-Use the checkboxes, Ctrl-click, Shift-click, or **Select all** to compare samples. The comparison covers thickness profiles, growth and cleaning traces, process conditions, QCM, and morphology. The Lightbox compares up to four wafers at once with linked viewing controls. Use **Save selected** to download a titled JSON collection and **Reload saved wafers** to import it.
+Use the checkboxes, Ctrl-click, Shift-click, or **Select all** to compare samples. The comparison covers thickness profiles, growth and cleaning traces, process conditions, QCM, zone-model operating points, and morphology. Operating points share axes when they use the same diagram. SEM and Grains share a camera and grid scale across groups of up to four wafers. The Lightbox also compares up to four wafers at once with linked viewing controls. Use **Save selected** to download a titled JSON collection and **Reload saved wafers** to import it.
 
 ## Build and test
 
