@@ -260,7 +260,6 @@ export class ChamberTransport {
     const target = Number(open);
     const fill = target + (this.fill - target) * Math.exp(-dt / (open ? .12 : .20));
     this.fill = reducedMotion ? target : fill < .0005 ? 0 : fill;
-    if (reducedMotion) { this.gasParticles = []; this.gasBudget = 0; return; }
     if (!gas || !this.fill) { this.gasParticles = []; this.gasBudget = 0; return; }
     const sourceY = sourceLevel(settings.distance);
     const meanPath = displayFreePath(sample.lambda, settings.distance);
@@ -314,7 +313,7 @@ export class ChamberTransport {
       const value = reducedMotion ? target : target + (this.power[key] - target) * Math.exp(-dt / time);
       this.power[key] = value < .004 ? 0 : value;
     }
-    if (reducedMotion || (!active && this.darkTime >= .85)) {
+    if (!active && this.darkTime >= .85) {
       this.particles = [];
       this.impacts = [];
       this.budgets = {};

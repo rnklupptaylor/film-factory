@@ -326,9 +326,10 @@ function drawChamberMotion() {
       chamber.gunFeed?.setAttribute('opacity', Number(open));
     }
   }
+  const idleText = isPreview() ? 'Preview' : seconds >= RUN_LENGTH ? 'Complete' : seconds > 0 ? 'Paused' : 'Standby';
   const powerText = running ? gasLeadIn ? 'Gas stabilising' : sample.targetIonOn === 0 ? 'No discharge'
     : isPreclean() ? 'Pre-clean · source off' : 'Power on'
-    : transport.visible ? 'Power off · fading' : isPreview() ? 'Preview' : 'Standby';
+    : transport.visible ? 'Power off · fading' : idleText;
   if (chamber.power.textContent !== powerText) chamber.power.textContent = powerText;
   if (chamber.ctx) transport.draw(chamber.ctx);
 }
