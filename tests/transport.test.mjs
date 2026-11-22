@@ -16,8 +16,8 @@ function scene(method, overrides = {}) {
   const config = processConfig(method, settings.symbol);
   const material = MATERIALS[settings.symbol];
   const sample = rates(config, settings, material);
-  const step = (active, frames, reduced = false, thickness = 3, residue = 0, gasOpen = active) => {
-    for (let i = 0; i < frames; i++) motion.update(1 / 60, active, config, method, settings, sample, material.mass, thickness, reduced, residue, gasOpen);
+  const step = (active, frames, reduced = false, thickness = 3, residue = 0, gasOpen = active, showParticles = !reduced) => {
+    for (let i = 0; i < frames; i++) motion.update(1 / 60, active, config, method, settings, sample, material.mass, thickness, reduced, residue, gasOpen, showParticles);
   };
   return { motion, config, settings, material, sample, step };
 }
@@ -133,6 +133,24 @@ test('reduced motion retains the circuit and powered state without moving tracer
   assert.match(diagram, /blocking capacitor/);
   assert.match(diagram, /− self-bias/);
   assert.match(diagram, /0 V return/);
+});
+
+test('particle visibility can change during a run while reduced motion still suppresses arc flashes', () => {
+  const { motion, step, sample } = scene('dc', { symbol: 'Al', oxygen: 25, pressure: -2.4 });
+  assert.equal(sample.arcing.severity, 'Severe');
+  motion.arcRandom = () => 0;
+  step(true, 60, true, 0, 0, true, true);
+  assert.ok(motion.particles.length && motion.gasParticles.length);
+  assert.equal(motion.targetArc, null);
+  step(true, 1, false);
+  assert.ok(motion.targetArc);
+  const lit = motion.power.plasma;
+  step(true, 1, false, 0, 0, true, false);
+  assert.equal(motion.particles.length + motion.gasParticles.length + motion.impacts.length, 0);
+  assert.equal(motion.targetArc, null);
+  assert.ok(motion.power.plasma > 0);
+  step(false, 1, false, 0, 0, false, false);
+  assert.ok(motion.power.plasma > 0 && motion.power.plasma < lit);
 });
 
 test('gas starts upstream of the discharge, continues during coating, and clears when the supply closes', () => {

@@ -48,6 +48,8 @@ let lastRender = 0;
 let lastVacuumReadout = 0;
 let frame = 0;
 let manualTheme = false;
+let particleOverride;
+let displayedMotionPreference;
 let chamber;
 let microscope;
 let lightbox;
@@ -64,6 +66,18 @@ const visibleProfile = () => isPreview() ? advanceFilm(bareFilm, sample, preview
 const visibleResidue = () => isPreview() ? residueAfter(1, sample, previewTime) : residue;
 const valveOpen = () => running && chamber.feed != null && (!chamber.feed.gun || settings.ionCurrent > 0);
 const readPressure = () => chamberPressure(settings, chamber.feed, transport.fill);
+const particlesEnabled = () => particleOverride ?? !motionPreference.matches;
+
+function renderParticleControl() {
+  const enabled = particlesEnabled();
+  const button = el('chamber-particles');
+  displayedMotionPreference = motionPreference.matches;
+  button.textContent = enabled ? 'Particles on' : 'Particles off';
+  button.setAttribute('aria-pressed', String(enabled));
+  button.title = motionPreference.matches && particleOverride === undefined
+    ? 'Your device requests reduced motion. Select to show particles during Growth.'
+    : 'Show or hide particles during Growth';
+}
 
 function route() {
   const [destination, section] = location.hash.slice(1).split('/');
@@ -305,7 +319,9 @@ function drawChamberSurface() {
 }
 
 function drawChamberMotion() {
-  if (!running || gasLeadIn || motionPreference.matches || !sample.arcing) transport.clearTargetArc();
+  if (displayedMotionPreference !== motionPreference.matches) renderParticleControl();
+  const showParticles = particlesEnabled();
+  if (!running || gasLeadIn || !showParticles || motionPreference.matches || !sample.arcing) transport.clearTargetArc();
   const { plasma, heat, beam, holder } = transport.power;
   chamber.plasma?.setAttribute('opacity', plasma);
   chamber.beam?.setAttribute('opacity', beam);
@@ -326,11 +342,12 @@ function drawChamberMotion() {
       chamber.gunFeed?.setAttribute('opacity', Number(open));
     }
   }
+  const idleText = isPreview() ? 'Preview' : seconds >= RUN_LENGTH ? 'Complete' : seconds > 0 ? 'Paused' : 'Standby';
   const powerText = running ? gasLeadIn ? 'Gas stabilising' : sample.targetIonOn === 0 ? 'No discharge'
     : isPreclean() ? 'Pre-clean · source off' : 'Power on'
-    : transport.visible ? 'Power off · fading' : isPreview() ? 'Preview' : 'Standby';
+    : transport.visible ? 'Power off · fading' : idleText;
   if (chamber.power.textContent !== powerText) chamber.power.textContent = powerText;
-  if (chamber.ctx) transport.draw(chamber.ctx);
+  if (chamber.ctx) transport.draw(chamber.ctx, showParticles);
 }
 
 function renderMetrics() {
@@ -841,7 +858,7 @@ function animate(now) {
     if (!gasLeadIn) setRunLabel('Running · 5×', 'Pause');
   } else if (running) trackFilm(dt, now);
   transport.update(Math.min(.05, elapsed), running && !gasLeadIn, config, variant, settings, sample,
-    material.mass, waferCentre(thickness), motionPreference.matches, residue, valveOpen());
+    material.mass, waferCentre(thickness), motionPreference.matches, residue, valveOpen(), particlesEnabled());
   if (plot === 'diagnostics' && sensorMode === 'vacuum' && (now - lastVacuumReadout > 100 || !transport.visible)) {
     lastVacuumReadout = now;
     renderInstruments();
@@ -967,6 +984,13 @@ el('chamber-labels').addEventListener('click', (event) => {
   button.setAttribute('aria-pressed', String(show));
   el('chamber-art').classList.toggle('hide-labels', !show);
 });
+el('chamber-particles').addEventListener('click', () => {
+  const enabled = !particlesEnabled();
+  particleOverride = enabled === !motionPreference.matches ? undefined : enabled;
+  renderParticleControl();
+  drawChamberMotion();
+  scheduleFrame();
+});
 el('sensor-view').addEventListener('click', (event) => {
   if (!event.target.dataset.sensor) return;
   sensorMode = event.target.dataset.sensor;
@@ -995,6 +1019,11 @@ el('theme').addEventListener('click', () => {
   theme(document.documentElement.dataset.theme !== 'dark');
 });
 themePreference.addEventListener('change', (event) => { if (!manualTheme) theme(event.matches); });
+motionPreference.addEventListener('change', () => {
+  renderParticleControl();
+  drawChamberMotion();
+  scheduleFrame();
+});
 compactChamber.addEventListener('change', renderChamber);
 standaloneSettings.addEventListener('change', () => {
   if (!standaloneSettings.matches && el('workspace').dataset.mobile === 'settings') showWorkspace('chamber');
@@ -1002,6 +1031,7 @@ standaloneSettings.addEventListener('change', () => {
 window.addEventListener('hashchange', route);
 
 theme(themePreference.matches);
+renderParticleControl();
 renderControls();
 compute(true);
 route();
