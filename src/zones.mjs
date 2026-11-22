@@ -1,5 +1,6 @@
 import { ITO_OXIDE_PA, TIN_NITROGEN_PA } from './physics.mjs';
 import { processGas, substrateStatus } from './instruments.mjs';
+import { labelledPointsMarkup } from './graphics.mjs';
 
 const MOVCHAN = ['Movchan–Demchishin', 'https://jglobal.jst.go.jp/en/detail?JGLOBAL_ID=200902029851583157'];
 const THORNTON = ['Thornton (1974)', 'https://doi.org/10.1116/1.1312732'];
@@ -237,15 +238,28 @@ function thorntonArtwork(x,y) {
     `<text class="zone-region-text" x="${x((labels[i]+labels[i+1])/2)}" y="${y(1.3)}" text-anchor="middle">${ZONE_NAMES[zone]}</text>`).join('');
 }
 
-export function zoneDiagramMarkup(model) {
+export function groupZoneModels(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const { model } = entry;
+    // The compound windows can share axis names but have different ranges or thresholds.
+    const key = model.kind === 'window' ? model.name : model.kind;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  return [...groups.values()];
+}
+
+export function zoneDiagramMarkup(model, markers) {
   const left = 64, right = 411, top = 18, bottom = 168;
   const x = axisPosition(model.x, left, right);
   const y = model.y ? axisPosition(model.y, bottom, top) : null;
-  const [current, ordinate] = model.point;
   // The supported slider ranges are in view. Clamping protects the chart
   // if new recipe bounds are introduced before the diagram is extended.
-  const cx = Math.max(left, Math.min(right, x(current)));
-  const cy = y ? Math.max(top, Math.min(bottom, y(ordinate))) : 112;
+  const position = ([current, ordinate]) => [
+    Math.max(left, Math.min(right, x(current))),
+    y ? Math.max(top, Math.min(bottom, y(ordinate))) : 112,
+  ];
   let artwork = model.kind === 'thermal' ? thermalArtwork(x) : '';
   if (model.kind === 'thornton') artwork = thorntonArtwork(x,y);
   if (model.kind === 'arc') {
@@ -264,9 +278,13 @@ export function zoneDiagramMarkup(model) {
     return `<path class="zone-grid-line" d="M${left} ${py}H${right}"/><path class="zone-axis" d="M${left-4} ${py}h4"/>
       <text class="zone-tick" x="${left-7}" y="${py+4}" text-anchor="end">${value}</text>`;
   }).join('') : '';
-  const tracer = `<path class="zone-cursor" d="M${cx} ${y ? top : 40}V${bottom}${y ? `M${left} ${cy}H${right}` : ''}"/>
+  const [cx, cy] = position(model.point);
+  const tracer = markers ? labelledPointsMarkup(markers, position, right, top)
+    : `<path class="zone-cursor" d="M${cx} ${y ? top : 40}V${bottom}${y ? `M${left} ${cy}H${right}` : ''}"/>
     <circle class="zone-point-halo" cx="${cx}" cy="${cy}" r="8"/><circle class="zone-point" cx="${cx}" cy="${cy}" r="4.3"/>`;
-  return `<svg class="zone-diagram" viewBox="0 0 428 216" role="img" aria-label="${model.name}. ${model.operating}. ${model.reading}.">
+  const description = markers ? `${markers.length} selected operating points. Coordinates and model readings follow the diagram.`
+    : `${model.operating}. ${model.reading}.`;
+  return `<svg class="zone-diagram" viewBox="0 0 428 216" role="img" aria-label="${model.name}. ${description}">
     ${artwork}${xGrid}${yGrid}
     <path class="zone-axis" d="M${left} ${bottom}H${right}${y ? `M${left} ${bottom}V${top}` : ''}"/>
     <text class="zone-axis-label" x="${(left+right)/2}" y="209" text-anchor="middle">${model.x.label}</text>

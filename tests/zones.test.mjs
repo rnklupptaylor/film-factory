@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { VARIANTS, controlGroups, newSettings } from '../src/content.mjs';
 import { SUBSTRATES } from '../src/instruments.mjs';
 import { MATERIALS, rates } from '../src/physics.mjs';
-import { zoneDiagramMarkup, zoneModel } from '../src/zones.mjs';
+import { groupZoneModels, zoneDiagramMarkup, zoneModel } from '../src/zones.mjs';
 
 function plotFor(method, symbol = VARIANTS[method].materials[0], changes = {}) {
   const config = VARIANTS[method];
@@ -59,6 +59,27 @@ test('ion assistance, arc study and pre-clean use different comparisons', () => 
   const arc = plotFor('arc');
   assert.match(arc.operating, /Tₛ\/Tₘ = 0.208/);
   assert.match(zoneDiagramMarkup(arc), /Published sweep/);
+});
+
+test('comparison groups shared zone axes and keeps distinct study overlays separate', () => {
+  const methods = ['classic', 'ibad', 'itoCeramic', 'itoReactive', 'dc', 'diode', 'boat'];
+  const groups = groupZoneModels(methods.map((method) => ({ method, model: plotFor(method) })));
+  assert.deepEqual(groups.map((group) => group.map(({ method }) => method)),
+    [['classic', 'ibad'], ['itoCeramic'], ['itoReactive'], ['dc', 'diode'], ['boat']]);
+});
+
+test('comparison marks show coincident operating points together and preserve the original zone artwork', () => {
+  const lower = plotFor('boat');
+  const higher = plotFor('boat', 'Ag', { substrate: 500 });
+  const markers = [lower, lower, higher].map((model, index) => ({
+    point: model.point, label: index + 1, colour: '#2468ab', detail: model.operating,
+  }));
+  const plot = zoneDiagramMarkup(lower, markers);
+  assert.match(plot, /3 selected operating points/);
+  assert.match(plot, /comparison-point-number[^>]+>1\/2</);
+  assert.match(plot, /comparison-point-number[^>]+>3</);
+  assert.match(plot, /Zone III/);
+  assert.doesNotMatch(plot, /zone-point-halo|NaN|undefined/);
 });
 
 test('every selectable method and control endpoint has a finite diagram position', () => {

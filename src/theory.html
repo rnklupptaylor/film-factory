@@ -1,0 +1,122 @@
+  <main id="theory-page" class="theory-page" aria-labelledby="theory-title" hidden>
+    <article class="theory-article">
+      <a id="theory-return" class="section-back" href="#home">← Main menu</a>
+      <header class="theory-intro">
+        <h1 id="theory-title" tabindex="-1">Theory of thin-film deposition</h1>
+        <p>Follow the coating material from its source to the substrate, then use the diagnostics to explain the film that grows.</p>
+        <nav class="theory-contents" aria-label="On this page">
+          <a href="#theory/basics">PVD basics</a>
+          <a href="#theory/chamber">Chamber and substrate</a>
+          <a href="#theory/evaporation">Evaporation</a>
+          <a href="#theory/sputtering">Sputtering</a>
+          <a href="#theory/ion-plating">Ion plating</a>
+          <a href="#theory/diagnostics">Film and diagnostics</a>
+          <a href="#theory/cvd">Chemical vapour deposition</a>
+        </nav>
+      </header>
+
+      <section aria-labelledby="theory-basics">
+        <h2 id="theory-basics" tabindex="-1">PVD basics</h2>
+        <p>A <strong>thin film</strong> is a coating on a supporting material called the <strong>substrate</strong>. In physical vapour deposition (PVD), coating material leaves a source as atoms or ions, travels through a low-pressure chamber and accumulates on the substrate. An ion is an atom or molecule with an electrical charge. A plasma is a gas containing free electrons and ions.</p>
+        <dl class="theory-methods">
+          <div><dt>Evaporation</dt><dd>Heat releases atoms from the source.</dd></div>
+          <div><dt>Sputtering</dt><dd>Ion impacts eject atoms from a solid target.</dd></div>
+          <div><dt>Ion plating</dt><dd>Ions strike the substrate while coating material arrives.</dd></div>
+        </dl>
+        <h3>Comparing settings in the app</h3>
+        <p>Choose a method, a coating material and a substrate. <strong>Preview</strong> estimates the film that would form on a bare substrate in 5–180 seconds at the current settings. Use it to compare one change at a time. <strong>Growth</strong> follows a 60-second run at five times real time and records settings as you change them. Reset clears the simulated film and keeps the settings.</p>
+        <p>For a first comparison, keep the same material and temperature in Evaporation and increase the source–substrate distance. Compare the centre thickness and the edge-to-centre ratio in <strong>Profile</strong>. A film can become thinner while its thickness becomes more uniform.</p>
+        <p class="theory-sources"><a href="https://doi.org/10.1088/1361-6595/AC7F53" target="_blank" rel="noopener noreferrer">Gudmundsson, Anders and von Keudell · Foundations of physical vapour deposition</a></p>
+      </section>
+
+      <section aria-labelledby="theory-chamber">
+        <h2 id="theory-chamber" tabindex="-1">Chamber and substrate</h2>
+        <h3>Pressure and particle flight</h3>
+        <p><strong>Base pressure</strong> is the pressure reached after pumping the chamber down, before coating or admitting a process gas. <strong>Working pressure</strong> is the pressure during deposition. Sputter coaters typically admit argon while the pump keeps running, so the pressure settles as gas inflow balances removal. Reactive methods also admit a gas such as nitrogen or oxygen. The evaporation presets do not deliberately admit a process gas. In ion beam assisted deposition, argon is metered into the ion gun.</p>
+        <p>The <strong>mean free path</strong>, <i>λ</i>, is the average distance between collisions in the gas. Higher pressure means a shorter <i>λ</i>. Compare it with the source–substrate gap, <i>L</i>. For <i>L</i> much smaller than <i>λ</i>, most atoms cross the gap directly. If <i>L</i> is several times <i>λ</i>, collisions broaden the range of arrival angles and can reduce the flux that reaches the wafer.</p>
+        <details>
+          <summary>Transport model and animation</summary>
+          <p>The app estimates the mean free path with <i>λ</i> = <i>k</i><sub>B</sub><i>T</i>/(√2 π<i>d</i><sup>2</sup><i>p</i>), where <i>k</i><sub>B</sub> is the Boltzmann constant and <i>p</i> is the working pressure. It uses argon at 300 K with diameter <i>d</i> = 0.34 nm as a reference. The direct fraction is exp(−<i>L</i>/<i>λ</i>) and scattered collection uses the illustrative factor 1/(1 + <i>L</i>/(8<i>λ</i>)). The chamber animation slows flights, discharges and valve transients for viewing. Film growth calculations use the selected working pressure and separate rates.</p>
+        </details>
+        <h3>Temperature and electrical connections</h3>
+        <p>A resistance heater behind the holder sets the substrate temperature <i>T</i><sub>s</sub>. Warmer surfaces often let newly arrived atoms move farther before they become trapped in the growing film. The holder thermocouple is a proxy for the substrate temperature. The two can differ in a real chamber. Each selectable substrate has a thermal reference with a stated basis. For example, a glass strain point and a polymer service limit describe different behaviours.</p>
+        <p>Follow the electrical leads in the chamber to find the powered electrode and its return. A negatively biased electrode attracts positive ions. In a biased holder, the heater circuit has its own leads and is electrically isolated from the bias supply. In electron beam evaporation, the negative emitter sends electrons towards the grounded hearth.</p>
+        <p class="theory-sources"><a href="https://www.leybold.com/de-de/knowledge/blog/vacuum-coating-sputter-technology" target="_blank" rel="noopener noreferrer">Leybold · Gas throughput and pumping</a><a href="https://www.schott.com/en-us/products/borofloat/technical-details" target="_blank" rel="noopener noreferrer">SCHOTT · BOROFLOAT 33 technical data</a><a href="https://www.lesker.com/newweb/process_manipulation/samplemanip_technicalnotes_1.cfm?pgid=0" target="_blank" rel="noopener noreferrer">Kurt J. Lesker · Heated platens and thermocouples</a></p>
+      </section>
+
+      <section aria-labelledby="theory-evaporation">
+        <h2 id="theory-evaporation" tabindex="-1">Evaporation</h2>
+        <p>Heating raises the material's equilibrium <strong>vapour pressure</strong>, <i>p</i><sub>v</sub>. This is the pressure of vapour in equilibrium with the solid or liquid at a given temperature. In a pumped chamber, vapour escapes into the surrounding vacuum and some of it condenses on the cooler substrate. A solid can supply vapour by <strong>sublimation</strong>. The bulk melting point marks a change of phase, while the vapour-pressure curve helps decide whether the source will supply enough material.</p>
+        <p>In direct resistance heating, electric current heats the coating material itself. A heated boat transfers heat to a separate charge. A radiant heater transfers heat across a gap, and an electron beam concentrates energy on material in a hearth. Open <strong>Source</strong> to compare vapour pressure and the melting point for the selected material.</p>
+        <details>
+          <summary>Vapour-pressure model and silver benchmark</summary>
+          <p>The Hertz–Knudsen source flux is <i>p</i><sub>v</sub>/√(2π<i>mk</i><sub>B</sub><i>T</i>), where <i>m</i> is the mass of one atom and <i>T</i> is the source temperature in kelvin. The model interpolates log<sub>10</sub> <i>p</i><sub>v</sub> against 1/<i>T</i> from tabulated anchors. It assumes unit evaporation and sticking coefficients, a cosine emitter and effective source areas of 0.6–2.4 cm².</p>
+          <p>Kurt J. Lesker reports Ag deposition of 0.1–0.5 nm/s at about 1373 K and a base pressure at or below 10<sup>−6</sup> Torr. The model's Ag boat gives about 0.37 nm/s under comparable conditions. The rate measured in a particular coater also depends on geometry, source loading and sensor position.</p>
+        </details>
+        <p class="theory-sources"><a href="https://www.mbe-komponenten.de/selection-guide/vapor-pressure/" target="_blank" rel="noopener noreferrer">MBE-Komponenten · Vapour-pressure data</a><a href="https://www.lesker.com/newweb/deposition_materials/deposition-materials-notes.cfm?pgid=ag1" target="_blank" rel="noopener noreferrer">Kurt J. Lesker · Silver evaporation</a></p>
+      </section>
+
+      <section aria-labelledby="theory-sputtering">
+        <h2 id="theory-sputtering" tabindex="-1">Sputtering</h2>
+        <p>Argon ions accelerate towards a negatively biased <strong>target</strong> and transfer momentum to its atoms. Some atoms escape from the surface. The <strong>sputtering yield</strong>, <i>Y</i>, is the average number of atoms ejected per incident ion. Raising the ion energy can increase <i>Y</i>. Raising the ion current increases the number of impacts per second. The <strong>Source</strong> tab shows the yield, while <strong>Growth</strong> also reflects transport and collection at the substrate.</p>
+        <p>In a DC diode, the target and chamber support the discharge directly. A <strong>magnetron</strong> uses a magnetic field <i>B</i> to keep electrons near the target longer. These electrons create more argon ions close to the target, often at lower working pressure than a conventional diode. In pulsed DC, brief intervals help discharge patches where charge builds up. Radio-frequency (RF) power can sustain sputtering of an insulating target, such as silica. The RF target develops a negative time-averaged bias.</p>
+        <h3>Reactive coatings and ITO</h3>
+        <p>Adding nitrogen to a titanium sputtering discharge can form titanium nitride (TiN). Nitride can also form on the target, lowering the yield as more of its surface becomes compound-covered. This is called <strong>target poisoning</strong>. Similarly, reactive sputtering can oxidise an indium–tin alloy to form indium tin oxide (ITO), a transparent conductor. A second industrial route uses a conductive ITO ceramic target, often with a small oxygen addition to tune the film.</p>
+        <details>
+          <summary>Yield and composition in the simulation</summary>
+          <p>For singly charged Ar⁺, the target ejects approximately <i>I</i><sub>i</sub><i>Y</i>/<i>e</i> atoms per second, with ion current <i>I</i><sub>i</sub> and elementary charge <i>e</i>. The model interpolates metal yields over its energy range and uses effective ion energy and current for RF. The silica target uses a simplified effective yield.</p>
+          <p>The TiN recipe models compound coverage as competing nitrogen uptake and removal by ion impacts. The covered area uses 37% of the metallic yield and the nominal film switches to TiN above 0.15 Pa N₂. The ceramic ITO reference rate is 20 nm/min. The reactive In–Sn recipe changes towards ITO near 0.030 Pa O₂ in this model. Real transition pressures depend on the coater, pumping and power. The app does not calculate stoichiometry, sheet resistance or measured optical transmittance.</p>
+        </details>
+        <p class="theory-sources"><a href="https://doi.org/10.1088/1361-6595/AC7F53" target="_blank" rel="noopener noreferrer">Gudmundsson, Anders and von Keudell · Diode, magnetron and RF sputtering</a><a href="https://nifs-repository.repo.nii.ac.jp/record/2000175/files/NIFS-DATA-023.pdf" target="_blank" rel="noopener noreferrer">Yamamura and Tawara · Sputtering yield tables</a><a href="https://doi.org/10.1016/j.surfcoat.2006.08.111" target="_blank" rel="noopener noreferrer">Reactive sputtering of titanium in argon and nitrogen</a><a href="https://doi.org/10.3390/coatings11010092" target="_blank" rel="noopener noreferrer">Industrial pulsed DC magnetron sputtering of ITO</a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5456523/" target="_blank" rel="noopener noreferrer">RF magnetron sputtering of ITO</a></p>
+      </section>
+
+      <section aria-labelledby="theory-ion-plating">
+        <h2 id="theory-ion-plating" tabindex="-1">Ion plating and ion assistance</h2>
+        <p>Ion plating combines the arrival of coating material with energetic ion bombardment at the substrate. In classic ion plating, an evaporation source supplies material and a discharge supplies ions. A negative substrate bias accelerates positive ions through the <strong>sheath</strong>, the region where voltage drops between the plasma and the substrate.</p>
+        <p>In classic ion plating, <strong>Pre-clean</strong> runs the argon discharge with the evaporation source switched off. Ar⁺ ions can remove adsorbed molecules and sputter part of the exposed surface. Select <strong>Deposit</strong> to start film growth in the same chamber. The residue curve shows a modelled fraction of removable material. It cannot identify a contaminant or predict adhesion.</p>
+        <p>A cathodic arc releases vapour and ions from a moving spot on a titanium cathode. A nitrogen feed supplies the nitrogen for TiN. In <strong>ion beam assisted deposition</strong> (IBAD), a separate gun directs an ion beam at the substrate, so beam energy and current can be adjusted independently of the coating source.</p>
+        <p>Ion impacts can help atoms rearrange and fill voids. Energetic bombardment can also remove film atoms by <strong>resputtering</strong>. Net growth is the incoming deposition rate minus that loss, <i>R</i><sub>net</sub> = <i>R</i><sub>in</sub> − <i>R</i><sub>loss</sub>. If loss exceeds arrival, the existing film thins until the substrate is exposed.</p>
+        <details>
+          <summary>Ion transport and erosion assumptions</summary>
+          <p>The incoming rate is specified at a 14 cm reference gap before gas attenuation. Classic plating uses a collisional 6 mm sheath estimate. The arc model uses an effective ion charge of 1.5 elementary charges and 20 eV initial energy. The erosion estimates use Ar⁺ metal yields as proxies, including 45% of the Ti yield for TiN. Ion energy and ion flux influence different parts of the response.</p>
+        </details>
+        <p class="theory-sources"><a href="https://doi.org/10.1016/S0257-8972(00)00922-1" target="_blank" rel="noopener noreferrer">Mattox · Ion plating</a><a href="https://doi.org/10.4271/690647" target="_blank" rel="noopener noreferrer">Mattox · Sputter cleaning and adhesion</a><a href="https://doi.org/10.3390/coatings16040438" target="_blank" rel="noopener noreferrer">Cathodic arc deposition of TiN in nitrogen</a><a href="https://engineering.purdue.edu/CMUXE/Manuals/Ion%20guns/Ion%20gun%20KDC-10%20Manual.pdf" target="_blank" rel="noopener noreferrer">Kaufman &amp; Robinson · Ion source manual</a></p>
+      </section>
+
+      <section aria-labelledby="theory-diagnostics">
+        <h2 id="theory-diagnostics" tabindex="-1">Film and diagnostics</h2>
+        <h3>Source, Growth and Profile</h3>
+        <p><strong>Source</strong> shows the response that generates or removes coating material, such as vapour pressure, sputtering yield or ion-driven loss. <strong>Growth</strong> shows how the film at the wafer centre changes over time. <strong>Profile</strong> shows thickness across the 100 mm wafer. An edge-to-centre ratio near 100% indicates a more uniform deposit in the plotted profile, regardless of the total thickness.</p>
+        <h3>Sensors</h3>
+        <p>A <strong>quartz crystal microbalance</strong> (QCM) infers deposited mass from how much its crystal's resonance frequency falls. The crystal sits to the side of the wafer, so a <strong>tooling factor</strong> corrects for the different collection geometry. The app models a shielded, unbiased crystal. If ions remove film at the wafer, the wafer can be thinner than the thickness the crystal indicates.</p>
+        <p>The vacuum gauge reads total pressure and the residual gas analyser (RGA) estimates the contribution from individual gases. The thermocouple represents the holder temperature. Optical emission spectroscopy (OES) looks at light from excited species. In the reactive Ti example, the relative Ti emission is a modelled proxy for target yield at fixed discharge conditions.</p>
+        <details>
+          <summary>Sensor model assumptions</summary>
+          <p>The 6 MHz QCM uses the Sauerbrey relation, Δ<i>f</i> = −2<i>f</i><sub>0</sub><sup>2</sup>(<i>m</i>/<i>A</i>)/√(ρ<sub>q</sub>μ<sub>q</sub>), for a thin, rigid mass load. Here <i>m</i>/<i>A</i> is deposited mass per area and ρ<sub>q</sub> and μ<sub>q</sub> are the quartz density and shear modulus. Bulk film density converts mass to indicated thickness. The model omits temperature drift and corrections for heavy or soft films. It represents high vacuum with a cold-cathode gauge and the working range with a capacitance diaphragm gauge, assuming differential pumping for the RGA at working pressures.</p>
+        </details>
+        <p class="theory-sources"><a href="https://doi.org/10.1007/BF01337937" target="_blank" rel="noopener noreferrer">Sauerbrey · Quartz crystal mass loading</a><a href="https://www.lesker.com/newweb/gauges/pdf/manuals/stm-2_operatingmanual.pdf" target="_blank" rel="noopener noreferrer">Kurt J. Lesker · QCM and tooling factor</a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4550329/" target="_blank" rel="noopener noreferrer">NIST · Vacuum gauge principles</a><a href="https://www.svc.org/clientuploads/directory/resource_library/04_037.pdf" target="_blank" rel="noopener noreferrer">Optical emission and residual gas process control</a></p>
+        <h3>Zone model</h3>
+        <p>A <strong>structure zone model</strong> maps broad trends in film structure. The homologous temperature <i>T</i><sub>s</sub>/<i>T</i><sub>m</sub> divides substrate temperature by the bulk melting temperature of the deposited material, both in kelvin. This helps compare materials whose atoms become mobile at different temperatures. Sputtering maps add gas pressure to describe how much the gas scatters incoming material. Ion-assisted maps also account for energy delivered at the surface.</p>
+        <p>The marker places the current settings on a schematic or study-specific comparison. Check <strong>Model notes</strong> for its axes and assumptions. The Anders-style view for classic ion plating and IBAD uses a simplified projection with the thermal part of <i>T</i>* and an Ar⁺ kinetic energy estimate. TiN, ITO and silica use comparisons suited to those coatings. Substrate and film thickness can shift actual structure trends.</p>
+        <p class="theory-sources"><a href="https://jglobal.jst.go.jp/en/detail?JGLOBAL_ID=200902029851583157" target="_blank" rel="noopener noreferrer">Movchan and Demchishin · Evaporated coatings</a><a href="https://doi.org/10.1116/1.1312732" target="_blank" rel="noopener noreferrer">Thornton · Sputtered coatings</a><a href="https://doi.org/10.1016/j.tsf.2009.10.145" target="_blank" rel="noopener noreferrer">Anders · Structure zones for energetic deposition</a></p>
+        <h3>Morphology</h3>
+        <p><strong>Morphology</strong> means the shape and arrangement of features in the film. Deposited atoms can start small islands, move across the surface and join existing islands. At oblique arrival angles, taller features can block incoming material from reaching lower ones. This <strong>shadowing</strong> can lead to open columns. Greater surface mobility can help fill gaps.</p>
+        <p>The SEM-style view highlights shape in grayscale. In <strong>Grains</strong>, colours mark modelled crystalline regions. A grain's reported diameter is that of a circle with the same exposed top area, in grid cells. Amorphous silica has no crystalline grains in the model. The areal RMS roughness is the root mean square deviation of the simulated surface height from its mean, with bare substrate cells counted at zero height.</p>
+        <details>
+          <summary>What the 3D model represents</summary>
+          <p>The 40 × 40 lateral grid uses coarse parcels. The evaporation model favours early island formation for silver and gold on oxides. In sputtering, collisions broaden angle distributions and reduce the contribution from energetic neutrals. In ion plating, energy delivered per arriving film unit increases local rearrangement up to a limit. The numerical loss rate removes exposed parcels. The model has no calibrated lateral grain scale, and cannot predict microscopy contrast, texture, stress or adhesion.</p>
+        </details>
+        <p class="theory-sources"><a href="https://doi.org/10.5755/j01.ms.18.4.3088" target="_blank" rel="noopener noreferrer">Bordo and Rubahn · Substrate effects in evaporated aluminium</a><a href="https://doi.org/10.1063/1.3483242" target="_blank" rel="noopener noreferrer">Álvarez et al. · Shadowing and columnar growth</a><a href="https://doi.org/10.1116/1.1601610" target="_blank" rel="noopener noreferrer">Petrov et al. · Nucleation, coalescence and film growth</a><a href="https://committee.iso.org/standard/74591.html" target="_blank" rel="noopener noreferrer">ISO 25178-2 · Areal surface texture</a></p>
+        <h3>Lightbox</h3>
+        <p>Rotate the whole coated wafer to see how its appearance changes with lighting and viewing angle. Smooth areas give sharper mirror-like reflections. Roughness scatters light over a wider range of angles, giving a matte appearance. Use <strong>Raking</strong> light to see uneven finish and the <strong>Light</strong> background to inspect a transparent coating. Scroll or pinch to zoom. Tints, transparency and the placement of visual defects are illustrative. The rendering omits thin-film interference and does not report measured gloss.</p>
+        <p class="theory-sources"><a href="https://www.nist.gov/publications/regimes-surface-roughness-measurable-light-scattering" target="_blank" rel="noopener noreferrer">NIST · Surface roughness and light scattering</a></p>
+      </section>
+
+      <section aria-labelledby="theory-cvd">
+        <h2 id="theory-cvd" tabindex="-1">Chemical vapour deposition</h2>
+        <p>In chemical vapour deposition (CVD), gases carry <strong>precursors</strong>, the starting chemicals for the coating. Reactions at or near the substrate produce a solid film. Volatile by-products leave with the exhaust. Depending on the process, heat or a plasma can drive the reaction. In PVD, the supply of coating material starts with physical release from a source or target, even when a reactive gas then contributes to the compound film.</p>
+        <p>Fluorine-doped tin oxide (FTO, SnO₂:F) is a transparent conducting coating commonly produced by atmospheric-pressure CVD on hot float glass. It is an industrial counterpart to the transparent conducting ITO films in the PVD simulator. The interactive CVD mode is in development.</p>
+        <p class="theory-sources"><a href="https://pubs.rsc.org/en/content/articlehtml/2015/tc/c5tc02144h" target="_blank" rel="noopener noreferrer">Noor et al. · CVD-grown FTO on float glass</a></p>
+      </section>
+    </article>
+  </main>

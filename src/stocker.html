@@ -1,0 +1,73 @@
+  <main id="stocker" class="stocker" aria-labelledby="stocker-title" hidden>
+    <header class="stocker-heading">
+      <div>
+        <h1 id="stocker-title" tabindex="-1">Wafer stocker</h1>
+        <p>Wafers stay in this browser. Save a file to move them to another device.</p>
+      </div>
+      <a class="button" href="#pvd">Open PVD</a>
+    </header>
+    <div class="stocker-actions">
+      <div class="stocker-buttons" aria-label="Wafer selection">
+        <button id="wafer-select-all" class="button" type="button">Select all</button>
+        <button id="wafer-select-none" class="button" type="button">Select none</button>
+        <button id="wafer-inspect-button" class="button" type="button" hidden>Inspect wafer</button>
+        <button id="wafer-compare-button" class="button primary" type="button" hidden>Compare films</button>
+      </div>
+      <div class="stocker-buttons" aria-label="Wafer files">
+        <button id="wafer-import" class="button" type="button">Reload saved wafers</button>
+        <input id="wafer-file" type="file" accept=".json,application/json" hidden>
+        <button id="wafer-save" class="button" type="button" disabled>Save selected</button>
+        <button id="wafer-remove" class="button" type="button" disabled>Remove selected</button>
+      </div>
+    </div>
+    <p id="wafer-count" class="section-meta stocker-count"></p>
+    <p id="wafer-notice" class="stocker-notice" role="status" hidden></p>
+    <div id="wafer-table-wrap" class="stocker-table-wrap" tabindex="0" role="region" aria-label="Scrollable wafer table" hidden>
+      <table class="stocker-table">
+        <thead id="wafer-columns"></thead>
+        <tbody id="wafer-rows"></tbody>
+      </table>
+    </div>
+    <p id="wafer-empty" class="stocker-empty">The stocker is empty. Add a preview or a completed Growth run from the PVD workspace, or reload a saved wafer file.</p>
+  </main>
+
+  <dialog id="wafer-inspector" class="wafer-dialog inspector" aria-labelledby="wafer-inspector-title">
+    <header class="wafer-dialog-heading">
+      <div><h2 id="wafer-inspector-title"></h2><p id="wafer-inspector-summary"></p></div>
+      <button class="button" type="button" data-wafer-close>Close</button>
+    </header>
+    <div class="wafer-dialog-scroll">
+      <div id="wafer-diagnostics"></div>
+      <details class="wafer-recipe"><summary>Recorded settings and process steps</summary><div id="wafer-recipe-body"></div></details>
+      <button id="wafer-restore" class="button" type="button">Load saved settings in PVD</button>
+    </div>
+  </dialog>
+
+  <dialog id="wafer-comparison" class="wafer-dialog comparison" aria-labelledby="wafer-comparison-title">
+    <header class="wafer-dialog-heading">
+      <div><h2 id="wafer-comparison-title">Compare films</h2><p id="wafer-comparison-summary"></p></div>
+      <button class="button" type="button" data-wafer-close>Close</button>
+    </header>
+    <nav id="wafer-compare-tabs" class="seg" aria-label="Film comparison">
+      <button type="button" data-compare="thickness" aria-pressed="true">Thickness</button>
+      <button type="button" data-compare="process" aria-pressed="false">Process &amp; sensors</button>
+      <button type="button" data-compare="graphs" aria-pressed="false">Graphs</button>
+      <button type="button" data-compare="zones" aria-pressed="false">Zone model</button>
+      <button type="button" data-compare="surface" aria-pressed="false">Morphology</button>
+      <button type="button" data-compare="lightbox" aria-pressed="false">Lightbox</button>
+    </nav>
+    <div id="wafer-comparison-body" class="wafer-dialog-scroll"></div>
+  </dialog>
+
+  <dialog id="wafer-export" aria-labelledby="wafer-export-title">
+    <form class="dialog-shell" id="wafer-export-form">
+      <header class="dialog-header"><h2 id="wafer-export-title">Save selected wafers</h2></header>
+      <label class="wafer-file-label">Collection title
+        <input id="wafer-collection-title" type="text" required maxlength="100" placeholder="e.g. Silver evaporation distance series" autofocus>
+      </label>
+      <div class="stocker-buttons">
+        <button class="button primary" type="submit">Download file</button>
+        <button class="button" type="button" data-wafer-close>Cancel</button>
+      </div>
+    </form>
+  </dialog>
