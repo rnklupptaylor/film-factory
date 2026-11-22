@@ -123,6 +123,21 @@ test('graph axes keep actual zero values distinct from quantities that do not ap
   assert.equal(bare.y, null);
 });
 
+test('electrical and direct ion settings round-trip with the correct comparison values', () => {
+  const electrical = exampleWafer('dc', 'Cu', { supplyMode: 'powerW', powerW: 120 });
+  const manual = exampleWafer('dc', 'Cu', { energy: 300, current: .35 });
+  const { wafers } = readWaferFile(JSON.stringify(waferFile('Electrical comparison', [electrical, manual])));
+  assert.deepEqual(wafers, [electrical, manual]);
+  const rows = waferGraphRows(wafers, 'power', 'perJoule');
+  assert.ok(Math.abs(rows[0].x - 120) < 1e-5 && rows[0].y > 0);
+  assert.deepEqual([rows[1].x, rows[1].y], [null, null]);
+  assert.equal(waferGraphRows(wafers, 'energy', 'current')[1].x, 300);
+  const old = readWaferFile(JSON.stringify({ ...waferFile('Old ion run', [manual]), schema: 2 }));
+  assert.deepEqual(old.wafers[0].settings, manual.settings);
+  assert.equal(validWafer({ ...electrical, settings: { ...electrical.settings, powerW: -80 } }), false);
+  assert.equal(validWafer({ ...electrical, variant: 'rf' }), false);
+});
+
 test('wafer graph domains handle one value and pressure decades without degeneracy', () => {
   assert.deepEqual(waferGraphDomain([0, 0]), [0, 1]);
   assert.deepEqual(waferGraphDomain([1e-6, 1e-2], true), [-6, -2]);

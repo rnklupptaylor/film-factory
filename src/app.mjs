@@ -1,5 +1,6 @@
 import { MATERIALS, POSITIONS, rates, advanceFilm, residueAfter } from './physics.mjs';
 import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups, newSettings, processConfig, sourceChart } from './content.mjs';
+import { hasDcSupply, supplyControl, supplyNames } from './discharge.mjs';
 import { sci, chartMarkup, growthPlot, profilePlot } from './graphics.mjs';
 import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
@@ -118,6 +119,10 @@ function chooseVariant(next) {
   variant = next;
   settings = newSettings(variant);
   config = processConfig(variant, settings.symbol);
+  if (hasDcSupply(config)) {
+    settings.supplyMode = 'powerW';
+    settings.powerW = supplyControl(config, 'powerW')[7];
+  }
   settings.wafer = config.wafer ?? wafer;
   material = MATERIALS[settings.symbol];
   transport.clear();
@@ -148,8 +153,14 @@ function showThermalDetails() {
 }
 
 function chooseMaterial(symbol) {
+  const hadSupply = hasDcSupply(config);
   settings.symbol = symbol;
   config = processConfig(variant, symbol);
+  if (!hasDcSupply(config)) delete settings.supplyMode;
+  else if (!hadSupply) {
+    settings.supplyMode = 'powerW';
+    settings.powerW ??= supplyControl(config, 'powerW')[7];
+  }
   material = MATERIALS[symbol];
   if (config.arcing) {
     settings.oxygen = 0;
@@ -164,7 +175,7 @@ function chooseMaterial(symbol) {
 function controlValue(key, value, unit) {
   if (key === 'pressure') return sci(10 ** value);
   if (key === 'bias' && !config.ibad) return `${value ? '−' : ''}${value} ${unit}`;
-  return `${number(value)} ${unit}`;
+  return `${number(value, key === 'dischargeA' ? 3 : 2)} ${unit}`;
 }
 
 function renderControls() {
@@ -199,7 +210,9 @@ function showWorkspace(view) {
 }
 
 function renderSliders() {
-  const [source, [pressure, distance, substrate, ...gas]] = controlGroups(config, material);
+  const [source, [pressure, distance, substrate, ...gas]] = controlGroups(config, material, settings);
+  el('supply-control').hidden = !hasDcSupply(config);
+  el('supply-mode').value = settings.supplyMode ?? 'ions';
   const slider = ([key, label, symbol, min, max, step, unit]) => {
     const disabled = isPreclean() && key === 'arrival';
     const value = disabled ? 'Source off' : controlValue(key, settings[key], unit);
@@ -215,6 +228,32 @@ function renderSliders() {
   renderThermalWarning();
 }
 
+function changeSupplyMode(mode) {
+  if (!hasDcSupply(config) || !Object.hasOwn(supplyNames, mode) || mode === settings.supplyMode) return;
+  recordSample();
+  if (mode !== 'ions') {
+    const [, , , min, max, step, , initial] = supplyControl(config, mode);
+    const point = sample.targetSupply;
+    const readback = point && { powerW: point.power, voltageV: point.voltage, dischargeA: point.currentOn }[mode];
+    const value = readback ?? settings[mode] ?? initial;
+    settings[mode] = Math.min(max, Math.max(min, min + step * Math.round((value - min) / step)));
+  }
+  settings.supplyMode = mode;
+  renderSliders();
+  compute();
+}
+
+function renderSupply() {
+  const point = sample.targetSupply;
+  const readout = el('supply-readout');
+  readout.hidden = !point;
+  if (!point) return;
+  const suffix = config.duty ? ' on' : '';
+  readout.innerHTML = `<span title="Delivered discharge power">${number(point.power, 0)} W</span><span title="Target voltage">−${number(point.voltage, 0)} V${suffix}</span><span title="Discharge current">${number(point.currentOn, 3)} A${suffix}</span>
+    <span title="Estimated ion impact energy">Eᵢ ${point.ionOn ? `${number(point.ionEnergy, 0)} eV` : '—'}</span><span title="Estimated average ion current">Iᵢ ${number(point.ionAverage, 3)} A${config.duty ? ' avg.' : ''}</span>
+    ${point.status ? `<strong>${point.status}</strong>` : ''}`;
+}
+
 function setupChamber() {
   const art = el('chamber-art');
   art.innerHTML = chamberMarkup(config, variant, settings, material, sample.film);
@@ -223,7 +262,7 @@ function setupChamber() {
   ctx?.scale(2, 2);
   chamber = {
     svg: art.firstElementChild, ctx, power: el('chamber-power'),
-    pressure: el('chamber-pressure'), gauge: el('chamber-gauge-type'), bias: el('chamber-bias'),
+    pressure: el('chamber-pressure'), gauge: el('chamber-gauge-type'), bias: el('chamber-bias'), targetVoltage: el('chamber-target-voltage'),
     film: el('in-chamber-film'), filmLabel: el('in-chamber-film-label'), residue: el('surface-residue'), heat: art.querySelectorAll('.heat-active'),
     plasma: el('plasma-glow'), beam: el('electron-guide'),
     coil: el('holder-coil'), valve: el('gas-valve-state'), lamp: el('gas-valve-lamp'),
@@ -248,6 +287,11 @@ function renderChamber() {
       .map(([name]) => `<span><i class="${swatches[name]}"></i> ${name} gas</span>`).join('');
   }
   if (chamber.bias) chamber.bias.textContent = `${settings.bias ? '−' : ''}${settings.bias} V`;
+  if (chamber.targetVoltage) {
+    const point = sample.targetSupply;
+    chamber.targetVoltage.textContent = point ? `−${number(point.voltage, 0)} V${config.duty ? ' on' : ''}`
+      : config.diode ? '−2.5 kV ref.' : 'Ion settings';
+  }
   drawChamberSurface();
   drawChamberMotion();
 }
@@ -282,7 +326,8 @@ function drawChamberMotion() {
       chamber.gunFeed?.setAttribute('opacity', Number(open));
     }
   }
-  const powerText = running ? gasLeadIn ? 'Gas stabilising' : isPreclean() ? 'Pre-clean · source off' : 'Power on'
+  const powerText = running ? gasLeadIn ? 'Gas stabilising' : sample.targetIonOn === 0 ? 'No discharge'
+    : isPreclean() ? 'Pre-clean · source off' : 'Power on'
     : transport.visible ? 'Power off · fading' : isPreview() ? 'Preview' : 'Standby';
   if (chamber.power.textContent !== powerText) chamber.power.textContent = powerText;
   if (chamber.ctx) transport.draw(chamber.ctx);
@@ -311,14 +356,14 @@ function renderMetrics() {
   metrics.classList.toggle('has-arcing', Boolean(config.arcing));
   const arcing = sample.arcing;
   metrics.innerHTML = values.map(([label, value, unit]) => `<div class="metric"><dt>${label}</dt><dd>${value} <small>${unit}</small></dd></div>`).join('')
-    + (config.arcing ? `<div class="metric arc-metric" data-severity="${arcing?.severity.toLowerCase() ?? 'unmodelled'}"><dt>Arcing</dt><dd>${arcing?.severity ?? 'Not modelled'}
-      <small>${arcing ? (arcing.reverseUs ? `${number(arcing.reverseUs, 2)} µs reverse` : 'recipe estimate') : 'for this recipe'}</small></dd></div>` : '');
+    + (config.arcing ? `<div class="metric arc-metric" data-severity="${arcing?.severity.toLowerCase() ?? 'unmodelled'}"><dt>Arcing</dt><dd>${arcing?.severity ?? (sample.targetIonOn === 0 ? 'Off' : 'Not modelled')}
+      <small>${arcing ? (arcing.reverseUs ? `${number(arcing.reverseUs, 2)} µs reverse` : 'recipe estimate') : sample.targetIonOn ? 'for this recipe' : 'no discharge'}</small></dd></div>` : '');
 }
 
 function renderSource({ config, settings, material, sample, clean, profile, preview, duration }) {
   const { family } = config;
   const meta = sourceChart(config, settings, material);
-  const [, , , min, max] = controlGroups(config, material).flat().find(([key]) => key === meta.control);
+  const [, , , min, max] = controlGroups(config, material, settings).flat().find(([key]) => key === meta.control);
   const rows = Array.from({ length: 65 }, (_, i) => {
     const x = min + (max - min) * i / 64;
     return [x, rates(config, { ...settings, [meta.control]: x }, material)];
@@ -330,13 +375,16 @@ function renderSource({ config, settings, material, sample, clean, profile, prev
     graph = { lines: [{ points }], yDomain: [Math.floor(points[0][1] + 1e-8), Math.ceil(points.at(-1)[1] - 1e-8)], log: true, marker: [settings.temperature, Math.log10(sample.vapour / 100)] };
     caption = `${phase} · bulk melting temperature Tₘ = ${material.melting} K.`;
   } else if (family === 'sputtering') {
-    const points = rows.map(([x, state]) => [x, state.yieldValue ?? state.gross]);
-    graph = { lines: [{ points }], yDomain: [0, Math.max(...points.map(([,y]) => y)) * 1.14], marker: [settings[meta.control], sample.yieldValue ?? sample.gross] };
-    caption = config.ito === 'ceramic' ? 'Reference-scale rate. The conductive ceramic supplies indium, tin and oxygen. O₂ affects film properties, which this rate model leaves fixed.'
+    const vertical = (state) => sample.targetSupply ? state.net : state.yieldValue ?? state.gross;
+    const points = rows.map(([x, state]) => [x, vertical(state)]);
+    graph = { lines: [{ points }], yDomain: [0, Math.max(.001, ...points.map(([,y]) => y)) * 1.14], marker: [settings[meta.control], vertical(sample)] };
+    const chemistry = config.ito === 'ceramic' ? 'Reference-scale rate. The conductive ceramic supplies indium, tin and oxygen. O₂ affects film properties, which this rate model leaves fixed.'
       : config.ito === 'alloy' ? `Modelled oxide coverage of the target ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
       : config.reactive ? `Modelled target coverage by compound ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.name}.`
-      : sample.arcing && sample.poisoning !== undefined ? `Modelled target oxide coverage ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.formula ?? sample.film.name}. Y counts ejected Al atoms per ion.`
+      : sample.poisoning !== undefined ? `Modelled target oxide coverage ${number(sample.poisoning * 100, 0)}%. Nominal film ${sample.film.formula ?? sample.film.name}.`
       : material.yields ? 'Approximate Ar⁺ yield for normal incidence on the selected metal.' : 'Effective rate model for an insulating silica target at 13.56 MHz.';
+    const point = sample.targetSupply;
+    caption = point ? `Modelled supply · ${point.status || 'steady discharge'}. ${chemistry}` : chemistry;
   } else if (clean) {
     const h = preview ? 0 : waferCentre(profile);
     const cleared = (conditions) => 100 * (1 - residueAfter(1, conditions, duration, h));
@@ -385,7 +433,7 @@ function diagnosticData() {
   return {
     config, settings, material, sample, preview, time, duration, clean: isPreclean(),
     label: preview ? `${previewTime} s preview` : 'This run',
-    discharge: preview || (running && !gasLeadIn),
+    discharge: sample.targetIonOn !== 0 && (preview || (running && !gasLeadIn)),
     film: preview ? sample.film : filmSurface ?? sample.film,
     get pressure() { return preview ? 10 ** settings.pressure : readPressure(); },
     get surface() { return surfaceInput(); },
@@ -601,9 +649,21 @@ function renderInstruments(data = diagnosticData()) {
   el('plot-meta').textContent = preview || waferInspection ? 'Discharge at working conditions' : 'Discharge';
   const readings = [];
   const { family } = config;
-  if (family === 'sputtering') readings.push(['Effective target ion current', `${number(discharge ? settings.current * (config.duty ? settings.duty / 100 : 1) : 0)} A`]);
+  if (family === 'sputtering') {
+    const point = sample.targetSupply;
+    const powered = preview || waferInspection || (running && !gasLeadIn);
+    if (point) {
+      readings.push([config.duty ? 'Average discharge power' : 'Discharge power', `${number(powered ? point.power : 0, 0)} W`],
+        [config.duty ? 'Target on-voltage' : 'Target voltage', powered ? `−${number(point.voltage, 0)} V` : 'Off'],
+        [config.duty ? 'Discharge on-current' : 'Discharge current', `${number(powered ? point.currentOn : 0, 3)} A`]);
+      if (config.duty) readings.push(['Average discharge current', `${number(powered ? point.currentAverage : 0, 3)} A`],
+        ['Estimated ion on-current', `${number(powered ? point.ionOn : 0, 3)} A`]);
+    }
+    readings.push(['Effective target ion energy', sample.targetIonOn && powered ? `${number(sample.targetEnergy, 0)} eV` : '—'],
+      [config.duty ? 'Average target ion current' : 'Effective target ion current', `${number(powered ? sample.targetIonAverage : 0, 3)} A`]);
+  }
   if (family === 'plating') readings.push(['Substrate ion current density', `${number(discharge ? settings.ionCurrent : 0)} mA/cm²`]);
-  if (config.reactive) readings.push(['OES · Relative Ti emission', discharge ? `${number(100 * (1 - .63 * sample.poisoning), 1)}%` : 'Off']);
+  if (config.reactive) readings.push(['OES · Relative Ti emission', discharge && sample.targetIonOn ? `${number(100 * (1 - .63 * sample.poisoning), 1)}%` : 'Off']);
     body.innerHTML = instrumentCards(readings) + `<p class="instrument-note">${config.reactive
     ? 'The Ti emission proxy follows the modelled metal yield at fixed discharge conditions.'
     : family === 'evaporation' ? 'The evaporation preset has no plasma discharge.'
@@ -657,6 +717,7 @@ function compute(rebuild = false) {
   crystalInput = crystalReading(config, settings, sample);
   if (rebuild || formerFilm !== sample.film) setupChamber();
   renderChamber();
+  renderSupply();
   renderThermalWarning();
   renderMetrics();
   renderPlot();
@@ -838,6 +899,8 @@ el('techniques').addEventListener('click', (event) => {
 });
 el('variant').addEventListener('change', (event) => chooseVariant(event.target.value));
 el('material').addEventListener('change', (event) => chooseMaterial(event.target.value));
+el('supply-mode').innerHTML = Object.entries(supplyNames).map(([id, name]) => option(id, name)).join('');
+el('supply-mode').addEventListener('change', (event) => changeSupplyMode(event.target.value));
 el('wafer').innerHTML = Object.entries(SUBSTRATES).map(([id, substrate]) => option(id, substrate.name)).join('');
 el('wafer').addEventListener('change', (event) => {
   settings.wafer = event.target.value;

@@ -1,6 +1,7 @@
 import { MATERIALS, POSITIONS, rates } from './physics.mjs';
 import { SUBSTRATES, crystalFrequencyShift, processGas } from './instruments.mjs';
 import { controlGroups, processConfig } from './content.mjs';
+import { supplyNames } from './discharge.mjs';
 import { chartMarkup, sci } from './graphics.mjs';
 import { makeMorphology } from './microstructure.mjs';
 import { FilmLightbox } from './lightbox.mjs';
@@ -22,18 +23,18 @@ const stockerNum = (value, digits = 2) => value !== 0 && Math.abs(value) < 10 **
   ? sci(value, 1) : Number(value.toFixed(digits)).toString().replace('-', '−');
 const stockerUniformity = (wafer) => stockerCentre(wafer) > 0 ? 100 * wafer.profile[0] / stockerCentre(wafer) : null;
 const stockerLabel = (wafer) => `${wafer.profile.some((height) => height > 0) ? stockerMaterial(wafer.film) : 'Bare wafer'} · ${shortWafer(wafer)}`;
-const stockerSettings = (config, settings) => controlGroups(config, MATERIALS[settings.symbol]).flat();
+const stockerSettings = (config, settings) => controlGroups(config, MATERIALS[settings.symbol], settings).flat();
 
 function stockerSettingValue(config, settings, key, unit) {
   const value = settings[key];
   if (key === 'pressure') return `${sci(10 ** value)} ${unit}`;
   if (key === 'bias' && !config.ibad && value !== 0) return `−${value} ${unit}`;
-  return `${stockerNum(value)} ${unit}`;
+  return `${stockerNum(value, key === 'dischargeA' ? 3 : 2)} ${unit}`;
 }
 
 function stockerSourceSettings(wafer) {
   const config = processConfig(wafer.variant, wafer.settings.symbol);
-  return controlGroups(config, MATERIALS[wafer.settings.symbol])[0].map(([key, , symbol, , , , unit]) =>
+  return controlGroups(config, MATERIALS[wafer.settings.symbol], wafer.settings)[0].map(([key, , symbol, , , , unit]) =>
     `${symbol} ${stockerSettingValue(config, wafer.settings, key, unit)}`).join(' · ');
 }
 
@@ -49,6 +50,7 @@ function stockerRecipeMarkup(wafer) {
     const stepConfig = processConfig(wafer.variant, settings.symbol);
     const values = stockerSettings(stepConfig, settings).filter(([key]) => former?.[key] !== settings[key])
       .map(([key, label, , , , , unit]) => `${label} ${stockerSettingValue(stepConfig, settings, key, unit)}`);
+    if (settings.supplyMode && settings.supplyMode !== former?.supplyMode) values.unshift(supplyNames[settings.supplyMode]);
     if (!former || former.preclean !== settings.preclean) values.unshift(settings.preclean ? 'Pre-clean' : 'Deposition');
     return `<li><strong>${stockerNum(start, 1)}–${stockerNum(elapsed, 1)} s</strong> · ${film ? stockerMaterial(film) : 'Coating source off'} · ${values.join(' · ')}</li>`;
   }).join('');
@@ -147,6 +149,14 @@ function compareWaferProcess(wafers) {
     ['Tooling factor (%)', wafers.map((wafer) => wafer.qcm.tooling)],
   ];
   const notes = ['Rates and conditions describe each saved recipe at the end of the stage. QCM mass and frequency shift are cumulative.'];
+  if (models.some((model) => model.targetSupply)) {
+    rows.push(['Final average discharge power (W)', models.map(({ targetSupply }) => targetSupply ? stockerNum(targetSupply.power, 0) : '—')],
+      ['Final target voltage, on-state (V)', models.map(({ targetSupply }) => targetSupply ? stockerNum(-targetSupply.voltage, 0) : '—')],
+      ['Final average target ion current (A)', models.map(({ targetIonAverage }) => targetIonAverage === undefined ? '—' : stockerNum(targetIonAverage, 3))],
+      ['Final centre deposition per joule (nm/J)', models.map((model) => model.targetSupply?.power > 0
+        ? stockerNum(waferCentre(model.localGross) / model.targetSupply.power, 4) : '—')]);
+    notes.push('Deposition per joule uses the estimated power delivered to the discharge. Compare the same film material and source geometry.');
+  }
   if (wafers.some((wafer) => wafer.qcm.tooling !== wafers[0].qcm.tooling || wafer.film !== wafers[0].film || waferHasMixedFilm(wafer))) {
     notes.push('QCM indicated thickness depends on the tooling factor and coating density. Use the same factor and a single common film material, or compare the raw mass and frequency shift instead.');
   } else {

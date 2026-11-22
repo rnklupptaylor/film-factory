@@ -177,6 +177,12 @@ a.button[aria-current="page"] { color: var(--accent); background: var(--accent-s
 .setting-select { display: grid; align-content: start; gap: .16rem; min-width: 0; font-size: .88rem; color: var(--muted); font-weight: 600; }
 .source-settings { min-inline-size: 0; margin: 0; padding: .3rem .5rem .35rem; border: 1px solid var(--line); border-radius: 7px; }
 .source-settings legend { padding-inline: .24rem; color: var(--muted); font-size: .82rem; font-weight: 680; }
+.supply-control { display: flex; align-items: center; gap: .45rem; margin-bottom: .28rem; font-size: .78rem; font-weight: 650; }
+.supply-control span { white-space: nowrap; }
+.supply-control select { min-width: 0; min-height: 27px; padding-block: .1rem; font-size: .82rem; }
+.supply-readout { display: flex; flex-wrap: wrap; column-gap: .55rem; margin: .2rem 0 0; font: .71rem/1.26 var(--mono); color: var(--muted); }
+.supply-readout span { white-space: nowrap; }
+.supply-readout strong { font-family: system-ui, sans-serif; }
 select {
   appearance: none;
   color: var(--ink);
@@ -705,6 +711,9 @@ dialog::backdrop { background: #0c1935a0; }
   .lab:has(.metrics.has-arcing) .slider output { font-size: .68rem; }
 }
 @media (max-height: 660px) {
+  .supply-control { margin-bottom: .12rem; }
+  .supply-control select { min-height: 23px; }
+  .supply-readout { margin-top: .13rem; font-size: .64rem; }
   .lab:has(.workspace[data-mobile="settings"]) .metrics { display: none; }
 }
 @media (min-height: 370px) and (max-height: 660px) {

@@ -2,9 +2,10 @@ import { MATERIALS, POSITIONS } from './physics.mjs';
 import { SUBSTRATES, substrateStatus } from './instruments.mjs';
 import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups, processConfig } from './content.mjs';
 import { DEFAULT_PULSE_KHZ } from './arcing.mjs';
+import { hasDcSupply, supplyNames } from './discharge.mjs';
 
 export const STOCKER_FORMAT = 'film-factory-wafer-stocker';
-export const STOCKER_SCHEMA = 2;
+export const STOCKER_SCHEMA = 3;
 export const LIGHTBOX_COMPARE_LIMIT = 4;
 export const WAFER_FILE_BYTES = 20 * 1024 * 1024;
 export const WAFER_FILE_COUNT = 5000;
@@ -45,7 +46,8 @@ function migrateLegacyWafer(wafer) {
 function validWaferRecipe(variant, settings) {
   if (!stockerRecord(settings) || !VARIANTS[variant].materials.includes(settings.symbol) || !stockerOwn(SUBSTRATES, settings.wafer)) return false;
   const config = processConfig(variant, settings.symbol);
-  return controlGroups(config, MATERIALS[settings.symbol]).flat().every(([key, , , min, max]) =>
+  if (settings.supplyMode !== undefined && (!hasDcSupply(config) || !stockerOwn(supplyNames, settings.supplyMode))) return false;
+  return controlGroups(config, MATERIALS[settings.symbol], settings).flat().every(([key, , , min, max]) =>
     stockerNumber(settings[key], min - 1e-8, max + 1e-8))
     && (!config.classic || typeof settings.preclean === 'boolean');
 }
@@ -88,7 +90,7 @@ export function waferFile(title, wafers) {
 
 export function readWaferFile(text) {
   const file = JSON.parse(text);
-  if (!stockerRecord(file) || file.format !== STOCKER_FORMAT || ![1, STOCKER_SCHEMA].includes(file.schema)
+  if (!stockerRecord(file) || file.format !== STOCKER_FORMAT || ![1, 2, STOCKER_SCHEMA].includes(file.schema)
     || typeof file.title !== 'string' || file.title.length > 100 || !Array.isArray(file.wafers)
     || file.wafers.length > WAFER_FILE_COUNT) {
     throw new Error('This file does not contain a valid Film Factory wafer collection.');

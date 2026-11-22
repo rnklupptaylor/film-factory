@@ -1,4 +1,5 @@
 import { hasAluminaRecipe, sputterArcing } from './arcing.mjs';
+import { sputterDischarge } from './discharge.mjs';
 
 export const KB = 1.380649e-23;
 export const E = 1.602176634e-19;
@@ -79,6 +80,7 @@ export function rates(config, settings, material) {
   const transmission = 1 / (1 + gap / (8 * lambda));
   const geometry = 1 / (Math.PI * gap ** 2);
   let gross, loss = 0, vapour, yieldValue, ionEnergy, ionDose, poisoning, film = material;
+  let targetSupply, targetEnergy, targetIonOn, targetIonAverage;
   let cleanRate = 0;
 
   if (config.family === 'evaporation') {
@@ -87,39 +89,43 @@ export function rates(config, settings, material) {
     const flux = vapour / Math.sqrt(2 * Math.PI * atomicMass * KB * settings.temperature);
     gross = thicknessRate(flux * config.area * geometry * transmission, material);
   } else if (config.family === 'sputtering') {
-    const ionCurrent = settings.current * (config.duty ? settings.duty / 100 : 1);
+    const hasAlumina = hasAluminaRecipe(config, settings.symbol) && settings.oxygen > 0;
+    const oxygenPa = 100 * 10 ** pressure * (settings.oxygen ?? 0) / 100;
+    // Representative partial Al yield for a fully oxidised target.
+    const oxideAlYield = .02;
+    const coverage = hasAlumina ? (current) => aluminaCoverage(oxygenPa, current, oxideAlYield) : undefined;
+    targetSupply = sputterDischarge(config, settings, coverage);
+    targetEnergy = targetSupply?.ionEnergy ?? settings.energy;
+    targetIonOn = targetSupply?.ionOn ?? settings.current;
+    targetIonAverage = targetSupply?.ionAverage ?? targetIonOn * (config.duty ? settings.duty / 100 : 1);
+    const ionCurrent = targetIonAverage;
     if (config.ito) {
       // Reference-scale thickness rate. The current and distance factors
       // normalise the schematic coater rather than specifying industrial power.
-      const factor = (ionCurrent / (.35 * .70)) * (settings.energy / 360) ** .65
+      const factor = (ionCurrent / (.35 * .70)) * (targetEnergy / 360) ** .65
         * (.085 / gap) ** 2 * transmission / (1 / (1 + .085 / (8 * meanFreePath(10 ** -2.65))));
       gross = (20 / 60) * factor;
       if (config.ito === 'alloy') {
-        const oxygenPa = (10 ** pressure * 100) * (settings.oxygen / 100);
         const uptake = oxygenPa / .013;
         poisoning = uptake / (uptake + ionCurrent / (.35 * .70));
         gross *= 1.65 * (1 - .55 * poisoning);
         film = oxygenPa === 0 ? MATERIALS.InSn : oxygenPa >= ITO_OXIDE_PA ? MATERIALS.ITO : MATERIALS.InSnOx;
       }
     } else if (material.yields) {
-      yieldValue = sputterYield(material, settings.energy);
+      yieldValue = sputterYield(material, targetEnergy);
     } else {
-      gross = .10 * (ionCurrent / .25) * (settings.energy / 350) ** .65 * (.085 / gap) ** 2 * transmission;
+      gross = .10 * (ionCurrent / .25) * (targetEnergy / 350) ** .65 * (.085 / gap) ** 2 * transmission;
     }
     if (config.reactive) {
       const nitrogen = 10 ** pressure * 100 * settings.nitrogen / 100;
       const uptake = nitrogen / .20;
-      poisoning = uptake / (uptake + ionCurrent / .25);
+      poisoning = uptake > 0 ? uptake / (uptake + ionCurrent / .25) : 0;
       yieldValue *= 1 - .63 * poisoning;
       film = nitrogen >= TIN_NITROGEN_PA ? MATERIALS.TiN : material;
     }
-    if (hasAluminaRecipe(config, settings.symbol) && settings.oxygen > 0) {
-      const oxygenPa = (100 * 10 ** pressure) * (settings.oxygen / 100);
-      // Partial Al yield of the poisoned branch, of the order measured
-      // by Schelfhout et al. The study also shows dependence on energy.
-      const oxideYield = Math.min(.02, yieldValue);
-      poisoning = aluminaCoverage(oxygenPa, ionCurrent, oxideYield);
-      yieldValue = (1 - poisoning) * yieldValue + poisoning * oxideYield;
+    if (coverage) {
+      poisoning = targetSupply?.coverage ?? coverage(ionCurrent);
+      yieldValue = (1 - poisoning) * yieldValue + poisoning * Math.min(oxideAlYield, yieldValue);
       if (poisoning >= .6) film = MATERIALS.Al2O3;
     }
     if (material.yields) {
@@ -156,8 +162,9 @@ export function rates(config, settings, material) {
     const scattered = config.family === 'evaporation' ? direct : .88 + .12 * direct;
     return gross * (direct * ballistic + scattered * (1 - ballistic));
   });
-  const arcing = sputterArcing(config, settings, poisoning);
-  return { gross, loss, net: gross - loss, localGross, vapour, yieldValue, ionEnergy, ionDose, poisoning, lambda, ballistic, film, theta, cleanRate, arcing };
+  const arcing = targetIonOn === 0 ? null : sputterArcing(config, settings, poisoning, targetIonOn);
+  return { gross, loss, net: gross - loss, localGross, vapour, yieldValue, ionEnergy, ionDose, poisoning, lambda, ballistic, film, theta, cleanRate,
+    arcing, targetSupply, targetEnergy, targetIonOn, targetIonAverage };
 }
 
 export function residueAfter(fraction, sample, seconds, filmAtCentre = 0) {

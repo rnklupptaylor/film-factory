@@ -25,7 +25,7 @@ function annotation(label, x, y, leader, { anchor = 'start', detail = '' } = {})
   </g>`;
 }
 
-function supply(x, y, title, first, second, {type = 'voltage', id = '', side = false, earthReturn = false, rating = ''} = {}) {
+function supply(x, y, title, first, second, {type = 'voltage', id = '', side = false, earthReturn = false, rating = '', ratingId = ''} = {}) {
   const firstX = x + 27;
   const secondX = x + 77;
   const connectorY = y + 70;
@@ -39,7 +39,7 @@ function supply(x, y, title, first, second, {type = 'voltage', id = '', side = f
   return `<g class="supply ${type}">
     <rect x="${x}" y="${y}" width="105" height="70" rx="8"/>
     <text class="supply-title" x="${x + 10}" y="${y + 20}">${title}</text>
-    ${rating ? `<text x="${x + 10}" y="${y + 40}">${rating}</text>` : ''}
+    ${rating ? `<text x="${x + 10}" y="${y + 40}"${ratingId ? ` id="${ratingId}"` : ''}>${rating}</text>` : ''}
     ${captions}<circle cx="${secondX}" cy="${connectorY}" r="3.4"/>
   </g>${earthReturn ? `<path class="ground-wire" d="M${secondX} ${connectorY + 3}v5"/>${earth(secondX, connectorY + 8)}` : ''}`;
 }
@@ -73,7 +73,8 @@ function circuitMarkup(config, method, y, preclean) {
     source = `${floorFeedthrough(384)}
       <path class="voltage-wire" d="M376 ${y + 6}h8V${rf ? 425 : 416}${route}"/>
       ${supply(503, yBox, title, rf ? '~ RF' : config.arc ? '− cathode' : '− target', rf ? '0 V' : '+ return',
-        {earthReturn:true,rating:rf ? '13.56 MHz' : config.diode ? '−2.5 kV' : ''})}`;
+        {earthReturn:true, rating:rf ? '13.56 MHz' : config.diode ? '−2.5 kV ref.' : config.arc ? '' : 'Ion settings',
+          ratingId: !rf && !config.arc ? 'chamber-target-voltage' : ''})}`;
   } else if (method === 'ebeam') {
     source = `${floorFeedthrough(400)}
       <path class="voltage-wire" d="M400 ${y + 33}V416H530V396"/>

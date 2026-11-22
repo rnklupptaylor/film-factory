@@ -195,14 +195,14 @@ export class ChamberTransport {
     const random = this.random;
     const sputtering = config.family === 'sputtering';
     if (sputtering) {
-      const current = settings.current;
+      const current = sample.targetIonOn;
       this.produce('target', pulse ? 21 + 82 * current : 0, dt, () => {
         const x = config.diode ? uniform(random, CHAMBER.targetLeft + 2, CHAMBER.targetRight - 2)
           : (random() < .5 ? 259 : 341) + uniform(random, -22, 22);
         const origin = config.diode ? [x + uniform(random, -50, 50), sourceY - uniform(random, 70, 145)]
           : [x + uniform(random, -16, 16), sourceY - uniform(random, 24, 58)];
         const duration = config.diode ? uniform(random, .29, .55) : uniform(random, .19, .38);
-        this.guide('argon', origin, [x, sourceY], duration * (350 / settings.energy) ** .25, 'target');
+        this.guide('argon', origin, [x, sourceY], duration * (350 / Math.max(50, sample.targetEnergy)) ** .25, 'target');
       });
       return;
     }
@@ -290,6 +290,7 @@ export class ChamberTransport {
   }
 
   update(dt, active, config, method, settings, sample, mass, thickness, reducedMotion, residue = 0, gasOpen = active) {
+    active = active && sample.targetIonOn !== 0;
     this.clock += dt;
     this.darkTime = active ? 0 : this.darkTime + dt;
     const pulse = !config.duty || (this.clock % .62) / .62 < settings.duty / 100;
@@ -301,7 +302,7 @@ export class ChamberTransport {
     const flowing = gasOpen && gas != null && (!gas.gun || settings.ionCurrent > 0);
     this.updateGas(dt, flowing, gas, settings, sample, reducedMotion);
     const targets = {
-      plasma: active && hasPlasma && (reducedMotion || pulse) ? .56 + .4 * Math.min(1, (settings.current ?? settings.ionCurrent + .35)) : 0,
+      plasma: active && hasPlasma && (reducedMotion || pulse) ? .56 + .4 * Math.min(1, (sample.targetIonOn ?? settings.ionCurrent + .35)) : 0,
       heat: active && hasHeater ? Math.min(1, .53 + .22 * Math.log1p(sample.gross * 5)) : 0,
       beam: active && method === 'ebeam' ? .9 : 0,
       holder: active || flowing ? .95 * -Math.expm1(-Math.max(0, settings.substrate - 295) / 170) : 0,

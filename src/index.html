@@ -121,7 +121,9 @@
           <label class="setting-select"><span id="material-label">Material</span><select id="material" aria-labelledby="material-label"></select></label>
           <fieldset class="source-settings">
             <legend>Source parameters</legend>
+            <label id="supply-control" class="supply-control" hidden><span>Supply mode</span><select id="supply-mode" aria-describedby="supply-readout"></select></label>
             <div id="source-sliders" class="source-sliders"></div>
+            <p id="supply-readout" class="supply-readout" hidden></p>
           </fieldset>
           <div id="distance-control"></div>
           <label class="setting-select"><span id="substrate-label">Substrate</span><select id="wafer" aria-labelledby="substrate-label" aria-describedby="substrate-limit"></select><span id="substrate-limit" class="wafer-limit"></span></label>
@@ -247,6 +249,7 @@
   <script>
   'use strict';
   %%ARCING.MJS%%
+%%DISCHARGE.MJS%%
   %%PHYSICS.MJS%%
   %%INSTRUMENTS.MJS%%
   %%CONTENT.MJS%%

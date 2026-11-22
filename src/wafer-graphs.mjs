@@ -11,9 +11,11 @@ export const waferGraphGroups = [
     pressure: { label: 'Working pressure (mbar)', log: true, value: ({ settings }) => 10 ** settings.pressure },
     distance: { label: 'Source–substrate distance (cm)', value: ({ settings }) => settings.distance },
     temperature: { label: 'Source temperature (K)', value: ({ config, settings }) => config.family === 'evaporation' ? settings.temperature : null },
-    energy: { label: 'Target ion energy (eV)', value: ({ config, settings }) => config.family === 'sputtering' ? settings.energy : null },
-    current: { label: 'Effective target ion current (A)', value: ({ config, settings }) => config.family === 'sputtering'
-      ? settings.current * (config.duty ? settings.duty / 100 : 1) : null },
+    energy: { label: 'Target ion energy (eV)', value: ({ sample }) => sample.targetIonOn > 0 ? sample.targetEnergy : null },
+    current: { label: 'Average target ion current (A)', value: ({ sample }) => sample.targetIonAverage },
+    power: { label: 'Average discharge power (W)', value: ({ sample }) => sample.targetSupply?.power },
+    voltage: { label: 'Target voltage magnitude, on-state (V)', value: ({ sample }) => sample.targetSupply?.voltage },
+    discharge: { label: 'Discharge current, on-state (A)', value: ({ sample }) => sample.targetSupply?.currentOn },
     duty: { label: 'Duty cycle (%)', value: ({ config, settings }) => config.duty ? settings.duty : null },
     frequency: { label: 'Pulse frequency (kHz)', value: ({ config, settings }) => config.arcing && config.duty ? settings.frequency : null },
     nitrogen: { label: 'Nitrogen fraction (%)', value: ({ config, settings }) => config.arc ? 100 : config.reactive ? settings.nitrogen : null },
@@ -29,6 +31,8 @@ export const waferGraphGroups = [
     averageRate: { label: 'Average net stage rate (nm/s)', value: ({ wafer, centre }) => (centre - wafer.growth[0][1]) / wafer.duration },
     netRate: { label: 'Final net rate (nm/s)', value: ({ sample }) => sample.net },
     incoming: { label: 'Final incoming rate (nm/s)', value: ({ sample }) => sample.gross },
+    perJoule: { label: 'Final centre deposition per joule (nm/J)', value: ({ sample }) =>
+      sample.targetSupply?.power > 0 ? waferCentre(sample.localGross) / sample.targetSupply.power : null },
     resputter: { label: 'Final resputter rate (nm/s)', value: ({ config, sample }) => config.family === 'plating' ? sample.loss : null },
     yield: { label: 'Effective sputtering yield (atoms/ion)', value: ({ sample }) => sample.yieldValue },
     residue: { label: 'Surface residue remaining (%)', value: ({ wafer }) => wafer.recipes.some((step) => step.settings.preclean === true)
