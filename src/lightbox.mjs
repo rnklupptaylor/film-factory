@@ -1,4 +1,5 @@
 import { makeMorphology } from './microstructure.mjs';
+import { FILM_OPTICS, SUBSTRATE_OPTICS, stackColour, stackColourCSS } from './optics.mjs';
 
 const FILM_COLOURS = {
   Silver: '#e1e6eb', Aluminium: '#c4ccd1', Gold: '#eec354', Chromium: '#adbabf',
@@ -85,6 +86,11 @@ uniform float raking;
 uniform float lightBackground;
 uniform float baseTransmission;
 uniform float zoom;
+uniform vec3 filmOpticsN;
+uniform vec3 filmOpticsK;
+uniform vec3 substrateOpticsN;
+uniform vec3 substrateOpticsK;
+uniform float filmInterference;
 
 const float RADIUS = 1.0;
 const float HALF_THICKNESS = .040;
@@ -102,6 +108,48 @@ float surfaceNoise(vec2 p) {
   vec3 q = fract(vec3(p.xyx)*.1031);
   q += dot(q, q.yzx + 33.33);
   return fract((q.x + q.y)*q.z);
+}
+
+// Exact normal-incidence reflectance of the air / film / substrate stack at
+// the three display wavelengths (650, 550, 450 nm). Complex numbers travel as
+// (re, im) vec3 pairs, one component per wavelength, matching src/optics.mjs.
+void cmul(vec3 ar, vec3 ai, vec3 br, vec3 bi, out vec3 cr, out vec3 ci) {
+  cr = ar*br - ai*bi;
+  ci = ar*bi + ai*br;
+}
+
+vec3 interferenceReflectance(float d) {
+  vec3 lambda = vec3(650., 550., 450.);
+  vec3 nf = filmOpticsN, kf = filmOpticsK;
+  vec3 ns = substrateOpticsN, ks = substrateOpticsK;
+  vec3 den01 = (1.+nf)*(1.+nf) + kf*kf;
+  vec3 r01r = (1. - nf*nf - kf*kf)/den01;
+  vec3 r01i = 2.*kf/den01;
+  vec3 den12 = (nf+ns)*(nf+ns) + (kf+ks)*(kf+ks);
+  vec3 r12r = ((nf-ns)*(nf+ns) - (ks-kf)*(kf+ks))/den12;
+  vec3 r12i = ((nf-ns)*(kf+ks) + (ks-kf)*(nf+ns))/den12;
+  vec3 wAtt = exp(-12.56637*kf*d/lambda);
+  vec3 wPh = 12.56637*nf*d/lambda;
+  vec3 wR = wAtt*cos(wPh), wI = -wAtt*sin(wPh);
+  vec3 q01r, q01i;
+  cmul(r01r, r01i, r12r, r12i, q01r, q01i);
+  vec3 w12r, w12i;
+  cmul(r12r, r12i, wR, wI, w12r, w12i);
+  vec3 tR = r01r + w12r, tI = r01i + w12i;
+  vec3 uR, uI;
+  cmul(q01r, q01i, wR, wI, uR, uI);
+  uR = uR + 1.;
+  vec3 den = uR*uR + uI*uI;
+  vec3 rr = (tR*uR + tI*uI)/den;
+  vec3 ri = (tI*uR - tR*uI)/den;
+  return rr*rr + ri*ri;
+}
+
+// Reduced photometric conversion, mirroring displayTint in src/optics.mjs.
+vec3 opticsTint(vec3 reflectance) {
+  vec3 lin = min(vec3(1.), 1.6*reflectance/(1. + 0.6*reflectance));
+  float luma = dot(lin, vec3(.2126, .7152, .0722));
+  return clamp(vec3(luma) + 1.5*(lin - vec3(luma)), 0., 1.);
 }
 
 float panel(vec3 ray, vec3 aim, vec2 dimensions, float spread) {
@@ -185,7 +233,18 @@ void main() {
     opacity *= 1. - texture2D(maskMap, .5 + .5*vec2(point.x, -point.y)).a;
   }
   float localRoughness = mix(substrateRoughness, min(.98,rough + .22*pit), opacity);
-  vec3 tint = mix(baseFinish.rgb, filmFinish.rgb, opacity*mix(.20,1.,metal));
+  vec3 filmTint = filmFinish.rgb;
+  vec3 throughTint = vec3(1.);
+  if (filmInterference > .5 && opacity > .0005) {
+    vec3 reflectance = interferenceReflectance(thickness);
+    // Rough or islanded films scatter light away from the mirror reflection,
+    // so the interference colour fades towards the painted finish there.
+    float gate = opacity*(1. - smoothstep(.28,.60,localRoughness));
+    vec3 interference = opticsTint(reflectance);
+    filmTint = mix(filmTint, interference, gate);
+    throughTint = mix(vec3(1.), opticsTint(vec3(1.) - reflectance), gate);
+  }
+  vec3 tint = mix(baseFinish.rgb, filmTint, opacity*mix(.20,1.,metal));
   float metallic = mix(baseFinish.a, metal, opacity);
   vec3 n = world(normal);
   float facing = max(0.,dot(n,-ray));
@@ -213,7 +272,12 @@ void main() {
     gl_FragColor = vec4(lit,1.);
     return;
   }
-  vec3 filterColour = mix(vec3(1.),pow(clamp(tint,0.,1.),vec3(.4545)),.15+.09*opacity);
+  // With interference the film transmittance multiplies the substrate's own
+  // transmission tint instead of reusing the reflected tint.
+  vec3 filmFilter = filmInterference > .5
+    ? pow(clamp(throughTint,0.,1.),vec3(.4545))*pow(clamp(baseFinish.rgb,0.,1.),vec3(.4545))
+    : pow(clamp(tint,0.,1.),vec3(.4545));
+  vec3 filterColour = mix(vec3(1.),filmFilter,.15+.09*opacity);
   vec3 throughSample = filterColour * backdropAt(pixel + .024*point.xy);
   float glare = max(key,fill)*sheen;
   float reflectedShare = max(fresnel.r,max(fresnel.g,fresnel.b));
@@ -258,7 +322,8 @@ function lightboxGL(canvas) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const uniforms = ['viewport','rotation','profileRange','filmFinish','baseFinish','substrateRoughness',
-    'filmState','raking','lightBackground','baseTransmission','zoom','maskEnabled'];
+    'filmState','raking','lightBackground','baseTransmission','zoom','maskEnabled',
+    'filmOpticsN','filmOpticsK','substrateOpticsN','substrateOpticsK','filmInterference'];
   return { gl, uniform: Object.fromEntries(uniforms.map(name => [name, gl.getUniformLocation(program, name)])) };
 }
 
@@ -396,6 +461,8 @@ export class FilmLightbox {
     const appearance = lightboxFilmAppearance(profile, model);
     this.appearance = appearance;
     this.filmColour = FILM_COLOURS[film.name] ?? film.colour;
+    this.opticsFilm = FILM_OPTICS[film.name] ? film.name : null;
+    this.wafer = wafer;
     const transparent = TRANSPARENT_FILMS.has(film.name);
     const [substrateColour, substrateMetal, substrateRoughness, transmission] = SUBSTRATE_FINISH[wafer] ?? SUBSTRATE_FINISH.silicon;
     this.substrateColour = substrateColour;
@@ -415,6 +482,13 @@ export class FilmLightbox {
       gl.uniform2f(uniform.profileRange, .5 / radialProfile.length, peak);
       gl.uniform4fv(uniform.filmFinish, finishChannels(this.filmColour, transparent ? .04 : .82));
       gl.uniform4fv(uniform.baseFinish, finishChannels(substrateColour, substrateMetal));
+      const filmOptics = FILM_OPTICS[film.name] ?? SUBSTRATE_OPTICS.silicon;
+      const substrateOptics = SUBSTRATE_OPTICS[wafer] ?? SUBSTRATE_OPTICS.silicon;
+      gl.uniform3fv(uniform.filmOpticsN, Float32Array.from(filmOptics, ([n]) => n));
+      gl.uniform3fv(uniform.filmOpticsK, Float32Array.from(filmOptics, ([, k]) => k));
+      gl.uniform3fv(uniform.substrateOpticsN, Float32Array.from(substrateOptics, ([n]) => n));
+      gl.uniform3fv(uniform.substrateOpticsK, Float32Array.from(substrateOptics, ([, k]) => k));
+      gl.uniform1f(uniform.filmInterference, FILM_OPTICS[film.name] ? 1 : 0);
       gl.uniform1f(uniform.substrateRoughness, substrateRoughness);
       gl.uniform1f(uniform.baseTransmission, transmission);
       gl.uniform4f(uniform.filmState, roughness, coverage, voidFraction, -Math.expm1(-scatter));
@@ -497,6 +571,20 @@ export class FilmLightbox {
     highlight.addColorStop(centre,`rgba(255,255,255,${.23 + .60*gloss})`);
     highlight.addColorStop(Math.min(.98,centre+spread),colour);
     highlight.addColorStop(1,colour);
+    let fillStyle = highlight;
+    const { peak, radialProfile: rings } = this.appearance;
+    if (!this.appearance.bare && this.opticsFilm && roundness > 0 && peak > 0) {
+      // Interference rings keyed to the modelled radial thickness profile.
+      const interference = ctx.createRadialGradient(0,0,0,0,0,radius);
+      const stops = Math.min(rings.length, 24);
+      for (let stop = 0; stop < stops; stop++) {
+        const index = Math.round(stop * (rings.length - 1) / (stops - 1));
+        const thickness = rings[index] / 255 * peak;
+        interference.addColorStop(stop / (stops - 1),
+          stackColourCSS(stackColour(this.opticsFilm, thickness, this.wafer)));
+      }
+      fillStyle = interference;
+    }
     ctx.strokeStyle = '#b7c8d1';
     ctx.lineWidth = Math.max(1,radius*.025);
     const disk = new Path2D();
@@ -514,7 +602,7 @@ export class FilmLightbox {
       ctx.save();
       ctx.clip(coatedArea, 'evenodd');
     }
-    ctx.fillStyle = highlight;
+    ctx.fillStyle = fillStyle;
     ctx.globalAlpha = 1 - this.transmission * (1 - (roundness > 0 ? opaqueCoating : 0)) * .78;
     ctx.fill(disk);
     ctx.globalAlpha = 1;
