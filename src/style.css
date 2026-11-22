@@ -172,8 +172,11 @@ a.button[aria-current="page"] { color: var(--accent); background: var(--accent-s
 .control-actions #preclean, .mobile-nav #compact-preclean { color: var(--accent); background: var(--accent-soft); }
 #compact-preclean { display: none; }
 .section-meta { color: var(--muted); font-size: .78rem; text-align: right; }
-.selects, .sliders { display: grid; align-content: start; gap: .66rem; }
-.selects label { display: grid; gap: .22rem; min-width: 0; font-size: .88rem; color: var(--muted); font-weight: 600; }
+.controls { overflow: auto; }
+.process-settings, .source-sliders { display: grid; align-content: start; gap: .55rem; }
+.setting-select { display: grid; align-content: start; gap: .16rem; min-width: 0; font-size: .88rem; color: var(--muted); font-weight: 600; }
+.source-settings { min-inline-size: 0; margin: 0; padding: .3rem .5rem .35rem; border: 1px solid var(--line); border-radius: 7px; }
+.source-settings legend { padding-inline: .24rem; color: var(--muted); font-size: .82rem; font-weight: 680; }
 select {
   appearance: none;
   color: var(--ink);
@@ -182,13 +185,12 @@ select {
   background: linear-gradient(45deg, transparent 50%, var(--muted) 50%) calc(100% - 13px) 53% / 5px 5px no-repeat, linear-gradient(135deg, var(--muted) 50%, transparent 50%) calc(100% - 8px) 53% / 5px 5px no-repeat, var(--surface);
   text-overflow: ellipsis;
 }
-.control-nav .seg button, .control-nav button { padding-inline: .33rem; }
 .plot-nav { flex-wrap: wrap; }
 .plot-nav button { padding-inline: .33rem; white-space: normal; }
-.slider { min-width: 0; }
-.slider label { display: flex; justify-content: space-between; align-items: baseline; gap: .25rem; font-size: .88rem; font-weight: 640; }
+.slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .04rem .42rem; min-width: 0; }
+.slider label { grid-column: 1 / -1; font-size: .88rem; line-height: 1.2; font-weight: 640; }
 .slider output { color: var(--accent); font-family: var(--mono); font-size: .84rem; white-space: nowrap; }
-.slider input { display: block; width: 100%; height: 26px; margin: .1rem 0 0; accent-color: var(--accent); cursor: ew-resize; }
+.slider input { display: block; width: 100%; min-width: 0; height: 26px; margin: 0; accent-color: var(--accent); cursor: ew-resize; }
 .slider input:disabled { opacity: .44; cursor: default; }
 .hardware-note { margin-top: auto; color: var(--muted); font-size: .8rem; }
 .chamber-art, .graphic { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; border-radius: 8px; }
@@ -296,7 +298,6 @@ select {
 .tooling { color: var(--muted); font-size: .8rem; }
 .tooling span { display: flex; justify-content: space-between; }
 .tooling input { display: block; width: 100%; margin: 0; accent-color: var(--accent); }
-.wafer-control { grid-column: 1 / -1; }
 .wafer-limit { color: var(--muted); font-size: .75rem; }
 .wafer-limit.above-limit { color: #b94b19; font-weight: 720; }
 :root[data-theme="dark"] .wafer-limit.above-limit { color: #ffb078; }
@@ -432,18 +433,34 @@ dialog::backdrop { background: #0c1935a0; }
   .workspace[data-mobile="chamber"] .results, .workspace[data-mobile="plots"] .chamber { display: none; }
 }
 @media (min-width: 651px) and (max-height: 900px) {
-  .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .34rem .65rem; }
-  .slider label { display: grid; align-content: start; gap: .06rem; font-size: .79rem; }
+  .source-sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .28rem .55rem; }
+  .source-sliders > :only-child { grid-column: 1 / -1; }
+  .slider label, .setting-select { font-size: .79rem; }
   .slider output { font-size: .77rem; }
+  .hardware-note { display: none; }
 }
-@media (min-width: 651px) and (max-height: 820px) {
-  .selects { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: .37rem; }
-  .selects label { gap: .1rem; font-size: .79rem; }
+@media (max-width: 650px), (max-height: 820px) {
+  .process-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .37rem .55rem; }
+  .process-settings > :is(.method-control, .source-settings, #substrate-temperature-control) { grid-column: 1 / -1; }
+  .process-settings > * { min-width: 0; }
+  .setting-select { gap: .1rem; }
 }
-@media (min-width: 971px) and (max-height: 700px) {
+@media (max-height: 820px) {
+  .controls .setting-select select { min-height: 28px; padding-block: .1rem; }
+  .process-settings { gap: .27rem .5rem; }
+  .source-settings { padding-block: .15rem; }
+  .slider label, .setting-select { font-size: .75rem; line-height: 1.18; }
+  .slider output { font-size: .73rem; }
+  .slider input { height: 20px; margin-block-start: 0; }
+  .wafer-limit { display: none; }
+}
+@media (min-width: 651px) and (max-height: 700px) {
   .controls { gap: .33rem; padding: .46rem; }
+  .controls .panel-header, .controls .panel-header .button { min-height: 24px; }
   .controls select { min-height: 28px; padding-block: .1rem; }
   .slider input { height: 20px; }
+  .process-settings { gap: .22rem .48rem; }
+  .source-settings { padding-block: .18rem; }
   .hardware-note { display: none; }
 }
 @media (max-width: 650px) {
@@ -469,13 +486,13 @@ dialog::backdrop { background: #0c1935a0; }
   .chamber .panel-header { display: none; }
   .controls .panel-header { min-height: 24px; }
   .panel-header h2 { font-size: .9rem; }
-  .selects { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: .35rem; }
-  .selects label { gap: .06rem; font-size: .74rem; }
+  .setting-select { gap: .06rem; font-size: .74rem; }
   select { min-height: 31px; font-size: .85rem; padding-block: .1rem; }
-  .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .13rem .5rem; }
-  .slider label { display: grid; align-content: start; font-size: .76rem; gap: .05rem; }
+  .source-sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem .5rem; }
+  .source-sliders > :only-child { grid-column: 1 / -1; }
+  .slider label { font-size: .76rem; }
   .slider output { font-size: .73rem; }
-  .slider input { height: 22px; margin: 0; }
+  .slider input { margin-inline: 0; margin-bottom: 0; }
   .wafer-limit { display: none; }
   .hardware-note { display: none; }
   .legend { gap: .55rem; font-size: .73rem; }
@@ -578,7 +595,7 @@ dialog::backdrop { background: #0c1935a0; }
   .seg button { min-width: 0; min-height: 26px; padding-inline: .25rem; font-size: .8rem; }
   .controls .panel-header { display: none; }
   #compact-guide { display: block; }
-  .selects label { font-size: .71rem; }
+  .setting-select { font-size: .71rem; }
   .slider label { font-size: .72rem; }
   .metric { padding-block: .07rem; }
   .metric dt { font-size: .68rem; }
@@ -601,10 +618,11 @@ dialog::backdrop { background: #0c1935a0; }
   .panel { padding: .29rem; gap: .18rem; }
   .controls .panel-header { min-height: 22px; }
   .controls .panel-header .button { min-height: 21px; }
-  .selects, .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .16rem .35rem; }
-  .selects label, .slider label, .slider output { font-size: .72rem; }
+  .process-settings, .source-sliders { gap: .16rem .35rem; }
+  .setting-select, .slider label, .slider output { font-size: .72rem; }
+  .source-settings { padding-block: .15rem; }
+  .source-settings legend { font-size: .76rem; }
   .wafer-limit { display: none; }
-  .slider label { display: grid; gap: 0; }
   select { min-height: 26px; }
   .slider input { height: 19px; margin: 0; }
   .seg button { min-height: 23px; padding-block: .1rem; }
@@ -627,27 +645,53 @@ dialog::backdrop { background: #0c1935a0; }
   #compact-guide { display: block; }
   #compact-preclean { display: block; }
 }
-@media (max-width: 479px) and (max-height: 740px), (min-width: 480px) and (max-width: 970px) and (max-height: 475px) {
+@media (max-width: 650px) and (max-height: 740px), (max-height: 660px) {
+  .mobile-nav { display: flex; }
   .mobile-nav [data-mobile="settings"] { display: block; }
   .mobile-nav button { flex-basis: auto; padding-inline: .22rem; font-size: .76rem; }
   #enlarge-chamber { display: none; }
-  .workspace[data-mobile="chamber"], .workspace[data-mobile="settings"] {
+  .workspace[data-mobile] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
   .workspace[data-mobile="settings"] .chamber, .workspace[data-mobile="settings"] .results,
-  .workspace[data-mobile="chamber"] .controls { display: none; }
-  .workspace[data-mobile="settings"] .wafer-control { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .32rem; }
+  .workspace[data-mobile="chamber"] .controls, .workspace[data-mobile="chamber"] .results,
+  .workspace[data-mobile="plots"] .controls, .workspace[data-mobile="plots"] .chamber { display: none; }
+}
+@media (min-width: 651px) and (max-height: 660px) {
+  .lab { grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+  .summary { display: none; }
+}
+@media (min-width: 480px) and (max-height: 660px) {
+  .controls .panel-header { display: none; }
+  #compact-guide, #compact-preclean { display: block; }
+  .process-settings { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .process-settings > :is(.method-control, #substrate-temperature-control) { grid-column: auto; }
+  .source-sliders { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 479px) and (max-height: 740px) {
   #compact-guide { display: none; }
   .workspace[data-mobile="settings"] .controls .panel-header { display: flex; }
 }
+@media (max-width: 360px) and (max-height: 655px) {
+  .controls { gap: .12rem; padding-block: .32rem; }
+  .workspace[data-mobile="settings"] .controls .panel-header { min-height: 21px; }
+  .controls .panel-header .button { min-height: 21px; }
+  .process-settings { gap: .13rem .42rem; }
+  .controls .setting-select select { min-height: 25px; }
+  .source-settings { padding-block: .08rem; }
+  .source-sliders { gap: .12rem .45rem; }
+  .slider input { height: 18px; }
+  .slider label { font-size: .71rem; }
+}
+@media (max-height: 660px) {
+  .lab:has(.workspace[data-mobile="settings"]) .metrics { display: none; }
+}
 @media (min-width: 480px) and (max-width: 970px) and (max-height: 475px) {
   .lab-top h1 { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
-  .workspace[data-mobile="settings"] .selects label { gap: .06rem; }
-  .workspace[data-mobile="settings"] .sliders { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .workspace[data-mobile="settings"] .slider label { display: flex; line-height: 1.16; }
+  .preview-duration { grid-template-columns: auto minmax(0, 1fr) 4ch; }
+  .preview-duration input { grid-column: 2; grid-row: 1; }
+  .preview-duration output { grid-column: 3; }
   .results:has(:is(.model-view, .lightbox-view):not([hidden])) {
     display: grid;
     grid-template-columns: minmax(135px, .75fr) minmax(0, 2fr);
@@ -663,4 +707,9 @@ dialog::backdrop { background: #0c1935a0; }
   .results:has(:is(.model-view, .lightbox-view):not([hidden])) .plot-nav button { padding: .12rem .17rem; font-size: .73rem; }
   .results :is(.model-view, .lightbox-view) { grid-column: 2; grid-row: 1 / -1; }
   .results:has(:is(.model-view, .lightbox-view):not([hidden])) .plot-caption { grid-row: 3; min-height: 0; font-size: .73rem; }
+}
+@media (min-width: 480px) and (max-height: 360px) {
+  .controls .setting-select select { min-height: 24px; }
+  .slider input { height: 16px; }
+  .process-settings, .source-sliders { gap: .1rem .35rem; }
 }

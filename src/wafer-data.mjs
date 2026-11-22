@@ -1,6 +1,6 @@
 import { MATERIALS, POSITIONS } from './physics.mjs';
 import { SUBSTRATES, substrateStatus } from './instruments.mjs';
-import { VARIANTS, RUN_LENGTH, controlGroups } from './content.mjs';
+import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups } from './content.mjs';
 
 export const STOCKER_FORMAT = 'film-factory-wafer-stocker';
 export const STOCKER_SCHEMA = 1;
@@ -32,6 +32,7 @@ function validWaferTrace(points, duration, low, high) {
 export function validWafer(wafer) {
   if (!stockerRecord(wafer) || typeof wafer.id !== 'string' || !knownWaferKey.test(wafer.id)
     || !stockerNumber(wafer.created, 1, 8.64e15) || typeof wafer.version !== 'string' || wafer.version.length > 30
+    || (wafer.technique !== undefined && wafer.technique !== 'pvd')
     || !stockerOwn(VARIANTS, wafer.variant) || !validWaferRecipe(wafer.variant, wafer.settings)
     || !['preview', 'growth'].includes(wafer.mode) || !stockerNumber(wafer.duration, 5, 180)
     || (wafer.mode === 'preview' ? wafer.duration % 5 !== 0 : wafer.duration !== RUN_LENGTH)
@@ -75,6 +76,12 @@ export function waferFilename(title, date = new Date()) {
 
 export function waferMaterialId(film) {
   return Object.keys(MATERIALS).find((key) => MATERIALS[key] === film);
+}
+
+export function waferClassification(wafer) {
+  const method = VARIANTS[wafer.variant];
+  // v1.2 files hold a PVD method ID and have no explicit technique field.
+  return { technique: (wafer.technique ?? 'pvd').toUpperCase(), subtechnique: TECHNIQUES[method.family].name, method: method.name };
 }
 
 export function waferCentre(profile) {

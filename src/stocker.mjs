@@ -7,7 +7,7 @@ import { FilmLightbox } from './lightbox.mjs';
 import { FilmMicroscope } from './microscope.mjs';
 import { groupZoneModels, zoneDiagramMarkup, zoneModel } from './zones.mjs';
 import { waferGraphAxes, waferGraphGroups, waferGraphRows, waferGraphDomain } from './wafer-graphs.mjs';
-import { LIGHTBOX_COMPARE_LIMIT, WAFER_FILE_BYTES, WAFER_FILE_COUNT, readWaferFile, waferFile, waferFilename, waferCentre, waferIsClean, waferHasMixedFilm, waferMorphologyReason, waferOverheated } from './wafer-data.mjs';
+import { LIGHTBOX_COMPARE_LIMIT, WAFER_FILE_BYTES, WAFER_FILE_COUNT, readWaferFile, waferFile, waferFilename, waferClassification, waferCentre, waferIsClean, waferHasMixedFilm, waferMorphologyReason, waferOverheated } from './wafer-data.mjs';
 
 const stockerStorage = 'film-factory-wafer-stocker-v1';
 const stockerEl = (id) => document.getElementById(id);
@@ -55,7 +55,9 @@ function stockerRecipeMarkup(wafer) {
 
 const stockerColumns = [
   ['wafer', 'Wafer', stockerLabel],
-  ['variant', 'Method', (wafer) => VARIANTS[wafer.variant].name],
+  ['technique', 'Technique', (wafer) => waferClassification(wafer).technique],
+  ['subtechnique', 'Subtechnique', (wafer) => waferClassification(wafer).subtechnique],
+  ['variant', 'Method', (wafer) => waferClassification(wafer).method],
   ['target', 'Source / target', (wafer) => stockerMaterial(wafer.settings.symbol)],
   ['substrate', 'Substrate', (wafer) => SUBSTRATES[wafer.settings.wafer].name],
   ['mode', 'Mode', stockerMode],
@@ -122,7 +124,9 @@ function compareWaferThickness(wafers) {
 function compareWaferProcess(wafers) {
   const models = wafers.map((wafer) => rates(VARIANTS[wafer.variant], wafer.settings, MATERIALS[wafer.settings.symbol]));
   const rows = [
-    ['Method', wafers.map((wafer) => VARIANTS[wafer.variant].name)],
+    ['Technique', wafers.map((wafer) => waferClassification(wafer).technique)],
+    ['Subtechnique', wafers.map((wafer) => waferClassification(wafer).subtechnique)],
+    ['Method', wafers.map((wafer) => waferClassification(wafer).method)],
     ['Substrate', wafers.map((wafer) => SUBSTRATES[wafer.settings.wafer].name)],
     ['Substrate temperature (K)', wafers.map((wafer) => wafer.settings.substrate)],
     ['Working pressure (mbar)', wafers.map((wafer) => sci(10 ** wafer.settings.pressure))],
@@ -444,7 +448,8 @@ export class WaferStocker {
       waferOverheated(wafer) ? 'Above substrate thermal reference during the run' : '',
       this.version === wafer.version ? '' : `Saved with v${wafer.version}. Reconstructed views use the current model.`,
     ].filter(Boolean);
-    stockerEl('wafer-inspector-summary').textContent = [VARIANTS[wafer.variant].name, SUBSTRATES[wafer.settings.wafer].name,
+    const { technique, subtechnique, method } = waferClassification(wafer);
+    stockerEl('wafer-inspector-summary').textContent = [technique, subtechnique, method, SUBSTRATES[wafer.settings.wafer].name,
       `${wafer.duration} s ${stockerMode(wafer).toLowerCase()}`, ...warnings].join(' · ');
     stockerEl('wafer-recipe-body').innerHTML = stockerRecipeMarkup(wafer);
     stockerEl('wafer-inspector').showModal();

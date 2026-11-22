@@ -1,6 +1,6 @@
 # Film Factory
 
-Film Factory is an interactive guide to thin-film deposition. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber. The menu also includes a placeholder for chemical vapour deposition (CVD).
+Film Factory is an interactive guide to thin-film deposition. Open **The Atom Shop (PVD)** from the start menu to explore evaporation, sputtering and ion plating in an interactive chamber. **The Reaction Room (CVD)** is the placeholder for chemical vapour deposition.
 
 | Branch | Cloudflare address |
 | --- | --- |
@@ -25,7 +25,7 @@ The Theory page introduces the deposition methods, explains the plots and instru
 
 ## Wafer stocker
 
-Use **Add to Stocker** for any Preview or once a Growth run completes. The stocker keeps the recipe, recorded process changes, and film results in this browser. Double-click a row or choose **Inspect wafer** to reopen its Film & Diagnostics. The inspector can load the final saved recipe into a fresh PVD case.
+Use **Add to Stocker** for any Preview or once a Growth run completes. The stocker keeps the recipe, recorded process changes, and film results in this browser. Its sortable columns distinguish technique, subtechnique and method. Double-click a row or choose **Inspect wafer** to reopen its Film & Diagnostics. The inspector can load the final saved recipe into a fresh PVD case.
 
 Use the checkboxes, Ctrl-click, Shift-click, or **Select all** to compare samples. The comparison covers thickness profiles, growth and cleaning traces, process conditions, QCM, zone-model operating points, and morphology. Operating points share axes when they use the same diagram. SEM and Grains share a camera and grid scale across groups of up to four wafers. The Lightbox also compares up to four wafers at once with linked viewing controls. Use **Save selected** to download a titled JSON collection and **Reload saved wafers** to import it.
 

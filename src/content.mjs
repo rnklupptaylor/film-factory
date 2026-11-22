@@ -52,7 +52,7 @@ export function controlGroups(config, material) {
   const pressureLimits = config.family === 'evaporation' ? [-7,-4] : config.diode ? [-1.7,-1.4]
     : config.ibad ? [-6,-3.3] : config.arc ? [-3.7,-2] : [-3,-1];
   const pressure = ['pressure', 'Chamber pressure', 'p', ...pressureLimits, .05, 'mbar'];
-  const distance = ['distance', 'Source distance', 'L', 5, 35, .5, 'cm'];
+  const distance = ['distance', 'Source–substrate distance', 'L', 5, 35, .5, 'cm'];
   const substrate = ['substrate', 'Substrate temperature', 'Tₛ', 290, 880, 5, 'K'];
   if (config.family === 'evaporation') {
     const temperature = ['temperature', 'Source temperature', 'T', Math.ceil(material.vapour[0] + 273), Math.floor(Math.min(config.maxC, material.vapour[3]) + 273), 1, 'K'];

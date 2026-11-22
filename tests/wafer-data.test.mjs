@@ -4,7 +4,7 @@ import { MATERIALS, POSITIONS, advanceFilm, rates } from '../src/physics.mjs';
 import { VARIANTS, newSettings } from '../src/content.mjs';
 import { crystalFrequencyShift, crystalReading } from '../src/instruments.mjs';
 import { growthConditions, makeMorphology } from '../src/microstructure.mjs';
-import { readWaferFile, validWafer, waferCentre, waferFile, waferFilename, waferMaterialId, waferMorphologyReason } from '../src/wafer-data.mjs';
+import { readWaferFile, validWafer, waferCentre, waferClassification, waferFile, waferFilename, waferMaterialId, waferMorphologyReason } from '../src/wafer-data.mjs';
 import { waferGraphDomain, waferGraphRows } from '../src/wafer-graphs.mjs';
 
 function exampleWafer(variant = 'boat', symbol = VARIANTS[variant].materials[0]) {
@@ -42,6 +42,18 @@ test('invalid recipes, malformed traces and foreign schema are rejected before i
   assert.equal(validWafer({ ...wafer, growth: [[0, 1], [70, 5], [60, 7]] }), false);
   assert.equal(validWafer({ ...wafer, settings: { ...wafer.settings, distance: 0 } }), false);
   assert.throws(() => readWaferFile(JSON.stringify({ ...waferFile('Other', [wafer]), schema: 99 })), /valid Film Factory/);
+});
+
+test('new and previously saved wafers have the same technique, subtechnique and method', () => {
+  for (const [variant, subtechnique] of [['boat', 'Evaporation'], ['diode', 'Sputtering'], ['classic', 'Ion plating']]) {
+    const old = exampleWafer(variant);
+    const current = { ...old, technique: 'pvd' };
+    const { wafers } = readWaferFile(JSON.stringify(waferFile('Techniques', [old, current])));
+    for (const wafer of wafers) assert.deepEqual(waferClassification(wafer), {
+      technique: 'PVD', subtechnique, method: VARIANTS[variant].name,
+    });
+    assert.equal(validWafer({ ...old, technique: 'cvd' }), false);
+  }
 });
 
 test('wafer export filenames are short and based on the collection title', () => {

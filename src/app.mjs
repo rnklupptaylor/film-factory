@@ -19,7 +19,7 @@ const rateNumber = (value) => value !== 0 && Math.abs(value) < .01 ? sci(value) 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const themePreference = matchMedia('(prefers-color-scheme: dark)');
 const compactChamber = matchMedia('(max-width: 650px), (max-height: 525px)');
-const standaloneSettings = matchMedia('(max-width: 479px) and (max-height: 740px), (min-width: 480px) and (max-width: 970px) and (max-height: 475px)');
+const standaloneSettings = matchMedia('(max-width: 650px) and (max-height: 740px), (max-height: 660px)');
 const transport = new ChamberTransport();
 const bareFilm = POSITIONS.map(() => 0);
 const resultsPanel = document.querySelector('.results');
@@ -32,7 +32,6 @@ let settings = newSettings(variant);
 let config = VARIANTS[variant];
 let material = MATERIALS[settings.symbol];
 let sample = rates(config, settings, material);
-let controlPage = 0;
 let plot = 'growth';
 let experimentMode = 'preview';
 let previewTime = Number(el('preview-time').value);
@@ -67,7 +66,7 @@ const readPressure = () => chamberPressure(settings, chamber.feed, transport.fil
 
 function route() {
   const [destination, section] = location.hash.slice(1).split('/');
-  const pages = { home: 'Film Factory', pvd: 'The Atom Shop (PVD)', cvd: 'Chemical vapour deposition (CVD)', theory: 'Theory', stocker: 'Wafer stocker' };
+  const pages = { home: 'Film Factory', pvd: 'The Atom Shop (PVD)', cvd: el('cvd-title').textContent, theory: 'Theory', stocker: 'Wafer stocker' };
   const previous = page;
   page = Object.hasOwn(pages, destination) ? destination : 'home';
   for (const id of Object.keys(pages)) el(id === 'theory' ? 'theory-page' : id).hidden = page !== id;
@@ -121,7 +120,6 @@ function chooseVariant(next) {
   settings = newSettings(variant);
   settings.wafer = config.wafer ?? wafer;
   material = MATERIALS[settings.symbol];
-  controlPage = 0;
   transport.clear();
   resetRun();
   renderControls();
@@ -159,7 +157,7 @@ function chooseMaterial(symbol) {
 }
 
 function controlValue(key, value, unit) {
-  if (key === 'pressure') return `${sci(10 ** value)} ${unit}`;
+  if (key === 'pressure') return sci(10 ** value);
   if (key === 'bias' && !config.ibad) return `${value ? '−' : ''}${value} ${unit}`;
   return `${number(value)} ${unit}`;
 }
@@ -196,16 +194,19 @@ function showWorkspace(view) {
 }
 
 function renderSliders() {
-  const groups = controlGroups(config, material);
-  const names = ['Source', 'Chamber'];
-  el('control-pages').innerHTML = groups.map((_, i) => `<button type="button" data-group="${i}" aria-pressed="${i === controlPage}">${names[i]}</button>`).join('');
-  const controls = groups[controlPage];
-  el('sliders').innerHTML = controls.map(([key, label, symbol, min, max, step, unit]) => {
+  const [source, [pressure, distance, substrate, ...gas]] = controlGroups(config, material);
+  const slider = ([key, label, symbol, min, max, step, unit]) => {
     const disabled = isPreclean() && key === 'arrival';
     const value = disabled ? 'Source off' : controlValue(key, settings[key], unit);
-    return `<div class="slider"><label for="setting-${key}"><span>${label} <i>${symbol}</i></span><output id="value-${key}" for="setting-${key}">${value}</output></label>
-      <input id="setting-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" data-key="${key}" data-unit="${unit}" aria-valuetext="${value}" ${disabled ? 'disabled' : ''}></div>`;
-  }).join('');
+    const pressureUnit = key === 'pressure' ? ` (${unit})` : '';
+    return `<div class="slider"><label for="setting-${key}">${label} <i>${symbol}</i>${pressureUnit}</label>
+      <input id="setting-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" data-key="${key}" data-unit="${unit}" aria-valuetext="${key === 'pressure' ? `${value} ${unit}` : value}" ${disabled ? 'disabled' : ''}>
+      <output id="value-${key}" for="setting-${key}">${value}</output></div>`;
+  };
+  el('pressure-control').innerHTML = slider(pressure);
+  el('source-sliders').innerHTML = [...source, ...gas].map(slider).join('');
+  el('distance-control').innerHTML = slider(distance);
+  el('substrate-temperature-control').innerHTML = slider(substrate);
   renderThermalWarning();
 }
 
@@ -406,7 +407,7 @@ function captureWafer() {
     : runRecipes.map(({ settings, duration, film }) => ({ settings, duration, film }));
   return structuredClone({
     id: globalThis.crypto?.randomUUID?.() ?? `wafer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    created: Date.now(), version: waferVersion, variant, settings, mode: experimentMode,
+    created: Date.now(), version: waferVersion, technique: 'pvd', variant, settings, mode: experimentMode,
     duration: data.duration, film, profile: data.profile, growth: data.growth,
     residue: data.residuePoints, qcm: data.qcm, surface: { segments, reference }, recipes,
   });
@@ -480,7 +481,6 @@ function restoreWaferSettings(wafer) {
     el('preview-time').setAttribute('aria-valuetext', `${previewTime} seconds`);
   }
   resetRun();
-  controlPage = 0;
   renderControls();
   switchExperiment(wafer.mode);
   compute(true);
@@ -832,14 +832,7 @@ el('wafer').addEventListener('change', (event) => {
   resetRun();
   compute(true);
 });
-el('control-pages').addEventListener('click', (event) => {
-  const target = event.target.closest('[data-group]');
-  if (!target) return;
-  controlPage = Number(target.dataset.group);
-  renderSliders();
-  el('control-pages').querySelector(`[data-group="${controlPage}"]`).focus();
-});
-el('sliders').addEventListener('input', (event) => {
+el('process-settings').addEventListener('input', (event) => {
   const control = event.target;
   const { key, unit } = control.dataset;
   if (!key) return;
@@ -847,7 +840,7 @@ el('sliders').addEventListener('input', (event) => {
   settings[key] = Number(control.value);
   const value = controlValue(key, settings[key], unit);
   el(`value-${key}`).value = value;
-  control.setAttribute('aria-valuetext', value);
+  control.setAttribute('aria-valuetext', key === 'pressure' ? `${value} ${unit}` : value);
   compute(key === 'distance');
 });
 document.querySelector('.plot-nav').addEventListener('click', (event) => {
