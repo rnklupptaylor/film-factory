@@ -23,6 +23,12 @@ Film Factory is an interactive guide to thin-film deposition. Open **The Atom Sh
 
 The Theory page introduces the deposition methods, explains the plots and instruments, and links to the scientific literature and material data. Expand the model details to find equations and assumptions. The rates are reduced-order teaching estimates. The morphology drawings illustrate trends.
 
+## Wafer stocker
+
+Use **Add to Stocker** for any Preview or once a Growth run completes. The stocker keeps the recipe, recorded process changes, and film results in this browser. Double-click a row or choose **Inspect wafer** to reopen its Film & Diagnostics. The inspector can load the final saved recipe into a fresh PVD case.
+
+Use the checkboxes, Ctrl-click, Shift-click, or **Select all** to compare samples. The comparison covers thickness profiles, growth and cleaning traces, process conditions, QCM, and morphology. The Lightbox compares up to four wafers at once with linked viewing controls. Use **Save selected** to download a titled JSON collection and **Reload saved wafers** to import it.
+
 ## Build and test
 
 Use Node.js 20 or later. No dependencies to install.

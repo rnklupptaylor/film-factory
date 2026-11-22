@@ -20,6 +20,7 @@
     </a>
     <div class="top-actions">
       <button id="thermal-warning" class="button thermal-warning" type="button" aria-label="Substrate thermal limit exceeded" hidden>⚠ Heat</button>
+      <a id="stocker-link" class="button" href="#stocker" aria-label="Wafer stocker">Stocker</a>
       <button id="theme" class="button theme" type="button" aria-label="Switch appearance" title="Switch appearance">◐</button>
       <a id="theory-link" class="button" href="#theory">Theory</a>
     </div>
@@ -218,10 +219,13 @@
         <span id="clock" class="clock">0 / 60 s</span>
         <span id="run-status" class="run-status" role="status">Ready</span>
       </div>
+      <button id="add-wafer" class="button" type="button">Add to Stocker</button>
+      <span id="add-wafer-status" class="visually-hidden" role="status"></span>
     </div>
   </main>
 
   %%THEORY.HTML%%
+  %%STOCKER.HTML%%
 
   <footer class="footer"><span>Concept by Prof. Robin N. Klupp Taylor · Developed with Codex</span><span>v%%VERSION%%</span></footer>
 
@@ -248,6 +252,8 @@
   %%MICROSCOPE.MJS%%
   %%LIGHTBOX.MJS%%
   %%ZONES.MJS%%
+  %%WAFER-DATA.MJS%%
+  %%STOCKER.MJS%%
   %%APP.MJS%%
   </script>
 </body>

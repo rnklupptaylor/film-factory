@@ -229,7 +229,7 @@ function pointerSpan(pointers) {
 }
 
 export class FilmLightbox {
-  constructor(canvas, status, workerCode) {
+  constructor(canvas, status, workerCode, { shareCamera, pixelLimit } = {}) {
     this.canvas = canvas;
     this.status = status;
     this.gpu = lightboxGL(canvas);
@@ -240,7 +240,9 @@ export class FilmLightbox {
     this.pointers = new Map();
     this.frame = 0;
     this.resetView();
-    try {
+    this.shareCamera = shareCamera;
+    this.pixelLimit = pixelLimit;
+    if (workerCode) try {
       const url = URL.createObjectURL(new Blob([workerCode], {type:'text/javascript'}));
       try { this.worker = new Worker(url); } finally { URL.revokeObjectURL(url); }
       this.worker.onmessage = ({ data }) => this.accept(data);
@@ -253,7 +255,8 @@ export class FilmLightbox {
         this.start(request);
       };
     } catch { /* Offline fallback uses the same summary calculation. */ }
-    new ResizeObserver(() => this.schedule()).observe(canvas);
+    this.resizeObserver = new ResizeObserver(() => this.schedule());
+    this.resizeObserver.observe(canvas);
     canvas.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || this.pointers.size >= 2) return;
       this.pointers.set(event.pointerId, [event.clientX, event.clientY]);
@@ -294,18 +297,36 @@ export class FilmLightbox {
   resetView() {
     this.angles = [-.21,-.51];
     this.zoom = 1;
-    this.schedule();
+    this.viewChanged();
   }
 
   zoomBy(factor) {
     this.zoom = Math.max(.60, Math.min(3.2, this.zoom * factor));
-    this.schedule();
+    this.viewChanged();
   }
 
   rotate(yaw, pitch) {
     this.angles[0] = (this.angles[0] + yaw) % (2 * Math.PI);
     this.angles[1] = Math.max(-1.48, Math.min(1.48, this.angles[1] + pitch));
+    this.viewChanged();
+  }
+
+  viewChanged() {
     this.schedule();
+    this.shareCamera?.(this);
+  }
+
+  copyCamera(source) {
+    this.angles = [...source.angles];
+    this.zoom = source.zoom;
+    this.schedule();
+  }
+
+  dispose() {
+    this.resizeObserver.disconnect();
+    this.worker?.terminate();
+    cancelAnimationFrame(this.frame);
+    this.gpu?.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
   request(request) {
@@ -319,6 +340,7 @@ export class FilmLightbox {
     if (!request) return;
     this.active = request;
     if (Math.max(...request.profile) <= .001) { this.accept(null); return; }
+    if (Object.hasOwn(request, 'model')) { this.accept(request.model); return; }
     if (this.worker) this.worker.postMessage(request.input);
     else setTimeout(() => this.accept(makeMorphology(request.input)), 0);
   }
@@ -379,7 +401,7 @@ export class FilmLightbox {
     const { canvas, appearance } = this;
     if (!appearance || !canvas.clientWidth || !canvas.clientHeight) return;
     const moving = this.pointers.size > 0;
-    const pixelLimit = moving ? 260000 : 780000;
+    const pixelLimit = Math.min(this.pixelLimit ?? Infinity, moving ? 260000 : 780000);
     const density = Math.min(moving ? 1.45 : 1.75, devicePixelRatio || 1, Math.sqrt(pixelLimit / (canvas.clientWidth * canvas.clientHeight)));
     const width = Math.max(1, Math.round(canvas.clientWidth * density));
     const height = Math.max(1, Math.round(canvas.clientHeight * density));

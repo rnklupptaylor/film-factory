@@ -30,7 +30,7 @@ export function chartMarkup({ title, xLabel, yLabel, xDomain, yDomain, log = fal
       <text x="${x0 - 8}" y="${py(y) + 4}" text-anchor="end">${log ? sci(10 ** y, 0) : axisLabel(y)}</text>
       <text x="${px(x)}" y="${y1 + 20}" text-anchor="middle">${axisLabel(x)}</text>`;
   }).join('');
-  const curves = lines.map((line) => `<path d="${pointsPath(line.points, px, py)}" stroke="${PALETTE[line.colour ?? 0]}" stroke-width="${line.dashed ? 2 : 2.8}" ${line.dashed ? 'stroke-dasharray="6 5"' : ''} fill="none" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
+  const curves = lines.map((line) => `<path d="${pointsPath(line.points, px, py)}" stroke="${line.stroke ?? PALETTE[line.colour ?? 0]}" stroke-width="${line.dashed ? 2 : 2.8}" ${line.dashed ? 'stroke-dasharray="6 5"' : ''} fill="none" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
   const cursor = marker ? `<path d="M${px(marker[0])} ${y0}V${y1}" stroke="var(--muted)" stroke-opacity=".5" stroke-dasharray="3 4"/><circle cx="${px(marker[0])}" cy="${py(marker[1])}" r="5" fill="var(--plot)" stroke="var(--surface)" stroke-width="2"/>` : '';
   return `<svg class="chart" viewBox="0 0 390 295" role="img" aria-label="${title}. ${yLabel} by ${xLabel}.">
     <text class="major" x="11" y="19">${yLabel}</text>${grid}

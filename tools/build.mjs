@@ -2,11 +2,14 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
-const [page, theory, pkg] = await Promise.all([read('src/index.html'), read('src/theory.html'), read('package.json')]);
+const [page, theory, stocker, pkg] = await Promise.all([
+  read('src/index.html'), read('src/theory.html'), read('src/stocker.html'), read('package.json'),
+]);
 const { version, teachingVersion = version } = JSON.parse(pkg);
-const includes = ['style.css', 'physics.mjs', 'instruments.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'microstructure.mjs', 'microscope.mjs', 'lightbox.mjs', 'zones.mjs', 'app.mjs'];
+const includes = ['style.css', 'physics.mjs', 'instruments.mjs', 'content.mjs', 'graphics.mjs', 'chamber.mjs', 'transport.mjs', 'microstructure.mjs', 'microscope.mjs', 'lightbox.mjs', 'zones.mjs', 'wafer-data.mjs', 'stocker.mjs', 'app.mjs'];
 const bundle = (source) => source.replace(/^import\s+.*?\s+from\s+['"][^'"]+['"];\r?\n/gms, '').replace(/^export\s+(?=(?:const|function|class)\s)/gm, '');
-let html = page.replaceAll('%%VERSION%%', teachingVersion).replace('%%THEORY.HTML%%', () => theory);
+let html = page.replaceAll('%%VERSION%%', teachingVersion)
+  .replace('%%THEORY.HTML%%', () => theory).replace('%%STOCKER.HTML%%', () => stocker);
 for (const name of includes) {
   const marker = `%%${name.toUpperCase()}%%`;
   if (!html.includes(marker)) continue;
