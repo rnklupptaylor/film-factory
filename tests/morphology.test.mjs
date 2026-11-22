@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { newSettings, VARIANTS } from '../src/content.mjs';
+import { newSettings, processConfig } from '../src/content.mjs';
 import { chamberPressure, crystalFrequencyShift, crystalReading, gasReadings, pressureGauge, processGas, substrateStatus } from '../src/instruments.mjs';
 import { arealRmsHeight, exposedGrains, grainColour, growthConditions, makeMorphology, simulateMorphology, surfaceMesh, SURFACE_VERTEX_STRIDE } from '../src/microstructure.mjs';
 import { sci } from '../src/graphics.mjs';
 import { MATERIALS, rates } from '../src/physics.mjs';
 
 function recipe(id, changes = {}) {
-  const config = VARIANTS[id];
   const settings = { ...newSettings(id), ...changes };
+  const config = processConfig(id, settings.symbol);
   const sample = rates(config, settings, MATERIALS[settings.symbol]);
   return { config, settings, sample, conditions: growthConditions(config, settings, sample) };
 }
@@ -87,7 +87,7 @@ test('QCM follows incident mass and the substrate warning switches at the stated
 });
 
 test('the gauge and partial pressures reflect chamber filling and show pressure with a superscript', () => {
-  const { config, settings } = recipe('reactive', { nitrogen: 20 });
+  const { config, settings } = recipe('dc', { symbol: 'Ti', pressure: -1.4, nitrogen: 20 });
   const gas = processGas(config, settings);
   const base = chamberPressure(settings, gas, 0);
   const working = chamberPressure(settings, gas, 1);

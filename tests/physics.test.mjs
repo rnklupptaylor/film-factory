@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MATERIALS, POSITIONS, advanceFilm, meanFreePath, rates, residueAfter, sputterYield, vapourPressure } from '../src/physics.mjs';
-import { VARIANTS, controlGroups, newSettings } from '../src/content.mjs';
+import { VARIANTS, controlGroups, newSettings, processConfig } from '../src/content.mjs';
 
 const check = (id, patch = {}) => {
   const settings = { ...newSettings(id), ...patch };
-  return rates(VARIANTS[id], settings, MATERIALS[settings.symbol]);
+  return rates(processConfig(id, settings.symbol), settings, MATERIALS[settings.symbol]);
 };
 
 test('argon mean free path scales as inverse chamber pressure in mbar', () => {
@@ -31,23 +31,30 @@ test('target current, pulse duty, and reactive poisoning affect yield and rate',
   assert.equal(sputterYield(MATERIALS.Ti, 600), .6);
   assert.ok(Math.abs(check('dc', { current: .4 }).net / check('dc', { current: .2 }).net - 2) < 1e-9);
   assert.ok(Math.abs(check('pulsed', { duty: 60 }).net / check('pulsed', { duty: 30 }).net - 2) < 1e-9);
-  assert.ok(check('reactive', { nitrogen: 10 }).yieldValue < check('reactive', {nitrogen: 0}).yieldValue);
-  assert.equal(check('reactive', {nitrogen: 0}).film, MATERIALS.Ti);
-  assert.equal(check('reactive', {nitrogen: 10}).film, MATERIALS.TiN);
+  for (const id of ['dc', 'pulsed']) {
+    const pure = check(id, { symbol: 'Ti', pressure: -1.4 });
+    const reactive = check(id, { symbol: 'Ti', pressure: -1.4, nitrogen: 10 });
+    assert.ok(reactive.yieldValue < pure.yieldValue);
+    assert.equal(pure.film, MATERIALS.Ti);
+    assert.equal(reactive.film, MATERIALS.TiN);
+    assert.equal(reactive.arcing, null);
+  }
   assert.equal(check('rf').yieldValue, undefined);
   assert.ok(check('rf').gross > 0);
 });
 
 test('industrial ITO recipes distinguish conductive oxide and reactive metal targets', () => {
-  const ceramic = check('itoCeramic', { oxygen: 0 });
+  const recipe = { pressure: -2.65, energy: 360, current: .35 };
+  const ceramic = check('pulsed', { ...recipe, symbol: 'ITO', oxygen: 0 });
   assert.equal(ceramic.film, MATERIALS.ITO);
   assert.ok(Math.abs(ceramic.net - 20 / 60) < 1e-12);
-  const metal = check('itoReactive', { oxygen: 0 });
-  const transition = check('itoReactive', { oxygen: 5 });
-  const oxide = check('itoReactive');
+  const metal = check('pulsed', { ...recipe, symbol: 'InSn', oxygen: 0 });
+  const transition = check('pulsed', { ...recipe, symbol: 'InSn', oxygen: 5 });
+  const oxide = check('pulsed', { ...recipe, symbol: 'InSn', oxygen: 16 });
   assert.equal(metal.film, MATERIALS.InSn);
   assert.equal(transition.film, MATERIALS.InSnOx);
   assert.equal(oxide.film, MATERIALS.ITO);
+  assert.equal(oxide.arcing, null);
   assert.ok(metal.net > transition.net && transition.net > oxide.net);
   assert.equal(check('arc').film, MATERIALS.TiN);
 });
@@ -80,9 +87,10 @@ test('classic pre-cleaning turns off deposition and clears exposed residue only 
 });
 
 test('every selectable preset and control limit produces finite nonnegative flux', () => {
-  for (const [id, config] of Object.entries(VARIANTS)) {
-    for (const symbol of config.materials) {
+  for (const [id, { materials }] of Object.entries(VARIANTS)) {
+    for (const symbol of materials) {
       const material = MATERIALS[symbol];
+      const config = processConfig(id, symbol);
       const settings = newSettings(id, symbol);
       const groups = controlGroups(config, material);
       assert.equal(groups.length, 2);

@@ -16,6 +16,9 @@ function referenceFrequency(reverseUs) {
 
 export function sputterArcing(config, settings, oxideCoverage = 0) {
   if (!config.arcing) return null;
+  // The pulse response is calibrated to insulating alumina patches.
+  if ((config.reactive && settings.nitrogen > 0)
+    || config.ito === 'ceramic' || (config.ito === 'alloy' && settings.oxygen > 0)) return null;
   const pressurePa = 100 * 10 ** settings.pressure;
   const relativeCurrent = settings.current / .35;
   const frequency = config.duty ? settings.frequency ?? DEFAULT_PULSE_KHZ : 0;

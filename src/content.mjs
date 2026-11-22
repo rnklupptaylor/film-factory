@@ -10,7 +10,7 @@ export const TECHNIQUES = {
   sputtering: {
     name: 'Sputtering', title: 'Sputter deposition',
     summary: 'Ar⁺ bombards a cathode target. Ejected atoms travel to the substrate and form a film.',
-    options: ['diode', 'dc', 'pulsed', 'rf', 'reactive', 'itoCeramic', 'itoReactive'],
+    options: ['diode', 'dc', 'pulsed', 'rf'],
   },
   plating: {
     name: 'Ion plating', title: 'Ion plating and ion assistance',
@@ -24,13 +24,10 @@ export const VARIANTS = {
   filament: { family: 'evaporation', name: 'Direct resistance heating', hardware: 'Directly heated Ti filament', materials: ['Ti'], area: .00012, maxC: 1660, defaults: { temperature: 1860, distance: 15 }, prompt: 'The current passes through Ti itself. Look for appreciable vapour pressure below its melting point.' },
   ebeam: { family: 'evaporation', name: 'Electron beam heating', hardware: 'E-beam hearth', materials: ['Ti','Cr','Au','Cu','Al','Ag'], area: .00024, maxC: 2050, defaults: { distance: 20 }, prompt: 'Switch between Cr and Au. Compare their vapour-pressure curves and the source phase at useful rates.' },
   radiant: { family: 'evaporation', name: 'Radiation heating', hardware: 'Radiant heater and crucible', materials: ['Ag','Al'], area: .00007, maxC: 1250, defaults: { distance: 16 }, prompt: 'Heat reaches the charge from a separate hot filament. Compare the rate at a common T with the boat.' },
-  diode: { family: 'sputtering', name: 'DC diode · conventional', hardware: 'DC diode cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], diode: true, defaults: { pressure: -1.55, energy: 300, current: .06 }, prompt: 'Run the conventional DC diode, then select DC magnetron. Compare the spread of Ar⁺ impacts, working pressure and arrival of sputtered atoms.' },
-  dc: { family: 'sputtering', name: 'DC magnetron', hardware: 'DC magnetron cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], magnetron: true, arcing: true, defaults: { energy: 350, current: .35, oxygen: 0 }, prompt: 'Compare the focussed discharge with the conventional DC diode. Then select Al, set the pressure to 4 × 10⁻³ mbar, and increase O₂ from 0 to 25% to see how target oxide affects arcing.' },
-  pulsed: { family: 'sputtering', name: 'Pulsed DC magnetron', hardware: 'Pulsed DC cathode', materials: ['Al','Ti','Cu','Cr','Ag','Au'], magnetron: true, arcing: true, duty: true, defaults: { energy: 450, current: .42, duty: 70, frequency: DEFAULT_PULSE_KHZ, oxygen: 0 }, prompt: 'With Al, set the pressure to 4 × 10⁻³ mbar, O₂ to 25%, and frequency to 40 kHz. Compare 100% duty with 90% duty at the same on-current. At 90% duty the 2.5 µs reverse interval can discharge oxide patches.' },
-  rf: { family: 'sputtering', name: 'RF magnetron · 13.56 MHz', hardware: 'RF cathode with DC self-bias', materials: ['SiO2','Al','Ti','Cu'], magnetron: true, defaults: { energy: 350, current: .25 }, prompt: 'Select fused silica. RF coupling sustains sputtering of an insulating target. Compare its effective rate with that of a metal.' },
-  reactive: { family: 'sputtering', name: 'Reactive magnetron · Ti + N₂', hardware: 'Reactive Ti cathode', materials: ['Ti'], magnetron: true, reactive: true, defaults: { pressure: -1.4, energy: 450, current: .60, nitrogen: 6, substrate: 520 }, prompt: 'Sweep the N₂ fraction across 5–8% at about 4 Pa total pressure. Watch the target coverage rise and the effective yield fall.' },
-  itoCeramic: { family: 'sputtering', name: 'Pulsed DC · ITO ceramic', hardware: 'Conductive ITO oxide target', materials: ['ITO'], magnetron: true, duty: true, ito: 'ceramic', wafer: 'borofloat', defaults: { pressure: -2.65, energy: 360, current: .35, oxygen: 1.5, substrate: 300 }, prompt: 'Sputter a conductive 90:10 by mass In₂O₃/SnO₂ ceramic target. Small additions of O₂ can tune film properties. Compare with the reactive alloy route, where oxygen supplies the oxide.' },
-  itoReactive: { family: 'sputtering', name: 'Reactive pulsed DC · ITO', hardware: 'In–Sn alloy target in Ar + O₂', materials: ['InSn'], magnetron: true, duty: true, ito: 'alloy', wafer: 'borofloat', defaults: { pressure: -2.65, energy: 360, current: .35, oxygen: 16, substrate: 300 }, prompt: 'Reduce O₂ to zero to sputter metallic In–Sn. Increase it to grow nominal ITO and see the modelled rate fall as the cathode oxidises. The transition depends on the coater.' },
+  diode: { family: 'sputtering', name: 'DC diode', hardware: 'DC diode cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], diode: true, defaults: { pressure: -1.55, energy: 300, current: .06 }, prompt: 'Run the DC diode, then select DC magnetron. Compare the spread of Ar⁺ impacts, working pressure and arrival of sputtered atoms.' },
+  dc: { family: 'sputtering', name: 'DC magnetron', hardware: 'DC magnetron cathode', materials: ['Cu','Ag','Al','Ti','Cr','Au'], magnetron: true, arcing: true, defaults: { energy: 350, current: .35 }, prompt: 'Compare the focussed discharge with the DC diode. Select Al for an optional oxygen feed or Ti for an optional nitrogen feed. At 0% the chamber runs in argon.' },
+  pulsed: { family: 'sputtering', name: 'Pulsed DC magnetron', hardware: 'Pulsed DC cathode', materials: ['Al','Ti','Cu','Cr','Ag','Au','ITO','InSn'], magnetron: true, arcing: true, duty: true, defaults: { energy: 450, current: .42, duty: 70, frequency: DEFAULT_PULSE_KHZ }, prompt: 'Select Al, Ti, ITO or In–Sn to explore an optional reactive gas feed. At 0% the chamber runs in argon.' },
+  rf: { family: 'sputtering', name: 'RF', hardware: 'RF magnetron · 13.56 MHz', materials: ['SiO2','Al','Ti','Cu'], magnetron: true, defaults: { energy: 350, current: .25 }, prompt: 'Select fused silica. RF coupling sustains sputtering of an insulating target. Compare its effective rate with that of a metal.' },
   classic: { family: 'plating', name: 'Classic ion plating', hardware: 'Evaporation source', materials: ['Ag','Cu','Al','Ti'], classic: true, defaults: { pressure: -1.45, bias: 1600, ionCurrent: .08, arrival: 2.8, preclean: false }, prompt: 'Select Pre-clean and run with the evaporation source off. Watch Ar⁺ bombard the negatively biased substrate. Switch to Deposit and compare the growth and residue plots.' },
   arc: { family: 'plating', name: 'Cathodic arc ion plating · TiN', hardware: 'Ti cathodic arc in N₂', materials: ['Ti'], arc: true, wafer: 'steel', defaults: { pressure: -2.35, bias: 100, ionCurrent: .65, arrival: 5.5, substrate: 670 }, prompt: 'Ti leaves the moving cathode spot as vapour and ions. The negative substrate bias attracts the ions. A continuous N₂ feed supplies nitrogen for the TiN layer. Increase bias and compare ion energy with net growth.' },
   ibad: { family: 'plating', name: 'Ion beam assisted deposition', hardware: 'Evaporation source + Ar⁺ gun', materials: ['Ag','Cu','Al','Ti'], ibad: true, defaults: { pressure: -4.7, bias: 150, ionCurrent: .25, arrival: .9 }, prompt: 'Sweep beam energy at fixed beam current. Compare the independent ion gun with the plasma sheath of classic ion plating.' },
@@ -38,9 +35,26 @@ export const VARIANTS = {
 
 const BASE_SETTINGS = {
   evaporation: { pressure: -5.9, distance: 18, substrate: 310 },
-  sputtering: { pressure: -2.55, distance: 8.5, substrate: 350, duty: 70, nitrogen: 6 },
+  sputtering: { pressure: -2.55, distance: 8.5, substrate: 350, nitrogen: 0, oxygen: 0 },
   plating: { distance: 14, substrate: 410 },
 };
+
+const sputterTargetRecipes = {
+  Ti: { reactive: true, prompt: 'At about 4 × 10⁻² mbar total pressure, sweep N₂ from 0% to 8%. Watch the nominal film change from Ti to TiN and the effective target yield fall.' },
+  ITO: { ito: 'ceramic', prompt: 'A conductive ITO ceramic target deposits ITO in pure argon. Small additions of O₂ can tune film properties. Compare with the In–Sn alloy target, where oxygen supplies the oxide.' },
+  InSn: { ito: 'alloy', prompt: 'At about 2.2 × 10⁻³ mbar, compare 0% O₂ with 16% O₂. The nominal film changes from metallic In–Sn to ITO as the target oxidises.' },
+};
+
+export function processConfig(id, symbol) {
+  const config = VARIANTS[id];
+  if (!config.arcing) return config;
+  if (symbol === 'Al') {
+    const pulseComparison = config.duty ? ' At 40 kHz, compare 100% with 90% duty at the same on-current.' : '';
+    return { ...config, prompt: `Set the pressure to 4 × 10⁻³ mbar and increase O₂ from 0% to 25% to see how target oxide affects arcing.${pulseComparison}` };
+  }
+  const recipe = sputterTargetRecipes[symbol];
+  return recipe ? { ...config, ...recipe } : config;
+}
 
 export function newSettings(id, symbol = VARIANTS[id].materials[0]) {
   const config = VARIANTS[id];
@@ -61,12 +75,12 @@ export function controlGroups(config, material) {
   }
   if (config.family === 'sputtering') {
     const energy = ['energy', config.diode ? 'Effective target ion energy' : config.arcing ? 'Ion energy' : 'Target ion energy', 'Eᵢ', 100, 600, 5, 'eV'];
-    const current = ['current', config.arcing && config.duty ? 'On-current' : config.duty ? 'Target on-current' : 'Target ion current', 'Iᵢ', config.diode ? .01 : .05, config.diode ? .10 : 1, .01, 'A'];
+    const current = ['current', config.duty ? 'On-current' : 'Target ion current', 'Iᵢ', config.diode ? .01 : .05, config.diode ? .10 : 1, .01, 'A'];
     const controls = [[energy, current], [pressure, distance, substrate]];
     if (config.duty) controls[0].push(['duty', 'Duty cycle', 'D', 20, 100, 1, '%']);
-    if (config.arcing && config.duty) controls[0].push(['frequency', 'Frequency', 'f', 10, 100, 5, 'kHz']);
+    if (config.duty) controls[0].push(['frequency', 'Frequency', 'f', 10, 100, 5, 'kHz']);
     if (config.reactive) controls[1].push(['nitrogen', 'Nitrogen fraction', 'N₂', 0, 25, .5, '%']);
-    if (config.ito || (config.arcing && material === MATERIALS.Al)) controls[1].push(['oxygen', config.arcing ? 'Gas fraction' : 'Oxygen fraction', 'O₂', 0, config.ito === 'ceramic' ? 5 : 25, .5, '%']);
+    if (config.ito || (config.arcing && material === MATERIALS.Al)) controls[1].push(['oxygen', 'Oxygen fraction', 'O₂', 0, config.ito === 'ceramic' ? 5 : 25, .5, '%']);
     return controls;
   }
   const bias = config.ibad ? ['bias', 'Ion beam energy', 'Eᵢ', 20, 600, 5, 'eV']

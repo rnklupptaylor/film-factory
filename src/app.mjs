@@ -1,5 +1,5 @@
 import { MATERIALS, POSITIONS, rates, advanceFilm, residueAfter } from './physics.mjs';
-import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups, newSettings, sourceChart } from './content.mjs';
+import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups, newSettings, processConfig, sourceChart } from './content.mjs';
 import { sci, chartMarkup, growthPlot, profilePlot } from './graphics.mjs';
 import { chamberMarkup } from './chamber.mjs';
 import { ChamberTransport } from './transport.mjs';
@@ -29,7 +29,7 @@ let page = 'home';
 let family = 'evaporation';
 let variant = 'boat';
 let settings = newSettings(variant);
-let config = VARIANTS[variant];
+let config = processConfig(variant, settings.symbol);
 let material = MATERIALS[settings.symbol];
 let sample = rates(config, settings, material);
 let plot = 'growth';
@@ -116,8 +116,8 @@ function chooseTechnique(next) {
 function chooseVariant(next) {
   const wafer = settings.wafer;
   variant = next;
-  config = VARIANTS[variant];
   settings = newSettings(variant);
+  config = processConfig(variant, settings.symbol);
   settings.wafer = config.wafer ?? wafer;
   material = MATERIALS[settings.symbol];
   transport.clear();
@@ -149,7 +149,12 @@ function showThermalDetails() {
 
 function chooseMaterial(symbol) {
   settings.symbol = symbol;
+  config = processConfig(variant, symbol);
   material = MATERIALS[symbol];
+  if (config.arcing) {
+    settings.oxygen = 0;
+    settings.nitrogen = 0;
+  }
   if (config.family === 'evaporation') settings.temperature = newSettings(variant, symbol).temperature;
   resetRun();
   renderControls();
@@ -303,11 +308,11 @@ function renderMetrics() {
     specific,
   ];
   const metrics = el('metrics');
-  metrics.classList.toggle('has-arcing', Boolean(sample.arcing));
+  metrics.classList.toggle('has-arcing', Boolean(config.arcing));
   const arcing = sample.arcing;
   metrics.innerHTML = values.map(([label, value, unit]) => `<div class="metric"><dt>${label}</dt><dd>${value} <small>${unit}</small></dd></div>`).join('')
-    + (arcing ? `<div class="metric arc-metric" data-severity="${arcing.severity.toLowerCase()}"><dt>Arcing</dt><dd>${arcing.severity}
-      <small>${arcing.reverseUs ? `${number(arcing.reverseUs, 2)} µs reverse` : 'recipe estimate'}</small></dd></div>` : '');
+    + (config.arcing ? `<div class="metric arc-metric" data-severity="${arcing?.severity.toLowerCase() ?? 'unmodelled'}"><dt>Arcing</dt><dd>${arcing?.severity ?? 'Not modelled'}
+      <small>${arcing ? (arcing.reverseUs ? `${number(arcing.reverseUs, 2)} µs reverse` : 'recipe estimate') : 'for this recipe'}</small></dd></div>` : '');
 }
 
 function renderSource({ config, settings, material, sample, clean, profile, preview, duration }) {
@@ -441,7 +446,7 @@ function addCurrentWafer() {
 
 function inspectWafer(wafer) {
   const material = MATERIALS[wafer.settings.symbol];
-  const config = VARIANTS[wafer.variant];
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
   waferInspection = {
     plot, sensorMode, tooling,
     data: {
@@ -475,7 +480,7 @@ function finishWaferInspection() {
 function restoreWaferSettings(wafer) {
   finishWaferInspection();
   variant = wafer.variant;
-  config = VARIANTS[variant];
+  config = processConfig(variant, wafer.settings.symbol);
   family = config.family;
   settings = { ...wafer.settings };
   material = MATERIALS[settings.symbol];

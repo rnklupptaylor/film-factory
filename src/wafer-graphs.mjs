@@ -1,6 +1,6 @@
 import { MATERIALS, rates } from './physics.mjs';
 import { hasAluminaRecipe } from './arcing.mjs';
-import { VARIANTS } from './content.mjs';
+import { processConfig } from './content.mjs';
 import { crystalFrequencyShift } from './instruments.mjs';
 import { waferCentre } from './wafer-data.mjs';
 
@@ -59,7 +59,7 @@ export function waferGraphRows(wafers, xKey, yKey, surfaces = []) {
   };
   return wafers.map((wafer, index) => {
     const settings = wafer.settings;
-    const config = VARIANTS[wafer.variant];
+    const config = processConfig(wafer.variant, settings.symbol);
     let sample;
     const data = {
       wafer, config, settings, surface: surfaces[index], centre: waferCentre(wafer.profile),

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chamberMarkup, CHAMBER, sourceLevel } from '../src/chamber.mjs';
-import { newSettings, TECHNIQUES, VARIANTS } from '../src/content.mjs';
+import { newSettings, processConfig, TECHNIQUES, VARIANTS } from '../src/content.mjs';
 import { MATERIALS, rates } from '../src/physics.mjs';
 import { ChamberTransport, displayFreePath } from '../src/transport.mjs';
 import { SUBSTRATES } from '../src/instruments.mjs';
@@ -12,8 +12,8 @@ function scene(method, overrides = {}) {
     seed = (1664525 * seed + 1013904223) >>> 0;
     return seed / 2 ** 32;
   });
-  const config = VARIANTS[method];
   const settings = { ...newSettings(method), ...overrides };
+  const config = processConfig(method, settings.symbol);
   const material = MATERIALS[settings.symbol];
   const sample = rates(config, settings, material);
   const step = (active, frames, reduced = false, thickness = 3, residue = 0, gasOpen = active) => {
@@ -32,7 +32,7 @@ test('neutral transport responds to pressure and moves away from an evaporation 
 });
 
 test('the default DC diode operates without magnets and magnetron diagrams show poles and field', () => {
-  assert.equal(TECHNIQUES.sputtering.options[0], 'diode');
+  assert.deepEqual(TECHNIQUES.sputtering.options, ['diode', 'dc', 'pulsed', 'rf']);
   for (const method of TECHNIQUES.sputtering.options) {
     const { config, settings, material, sample } = scene(method);
     const diagram = chamberMarkup(config, method, settings, material, sample.film);
@@ -93,11 +93,11 @@ test('ion plating displays evaporation and metal-ion paths arriving at the subst
 });
 
 test('reactive ITO shows distinct argon and oxygen feed tracers', () => {
-  const sputter = scene('itoReactive');
+  const sputter = scene('pulsed', { symbol: 'InSn', pressure: -2.65, oxygen: 16 });
   sputter.step(true, 150);
   assert.ok(sputter.motion.gasParticles.some(({ kind }) => kind === 'oxygen'));
   assert.ok(sputter.motion.gasParticles.some(({ kind }) => kind === 'gas-argon'));
-  const diagram = chamberMarkup(sputter.config, 'itoReactive', sputter.settings, sputter.material, sputter.sample.film);
+  const diagram = chamberMarkup(sputter.config, 'pulsed', sputter.settings, sputter.material, sputter.sample.film);
   assert.match(diagram, />Ar \+ O₂</);
   assert.match(diagram, />ITO film</);
 });

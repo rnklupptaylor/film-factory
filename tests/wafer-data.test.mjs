@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MATERIALS, POSITIONS, advanceFilm, rates } from '../src/physics.mjs';
-import { VARIANTS, newSettings } from '../src/content.mjs';
+import { VARIANTS, newSettings, processConfig } from '../src/content.mjs';
 import { crystalFrequencyShift, crystalReading } from '../src/instruments.mjs';
 import { growthConditions, makeMorphology } from '../src/microstructure.mjs';
 import { readWaferFile, validWafer, waferCentre, waferClassification, waferFile, waferFilename, waferMaterialId, waferMorphologyReason } from '../src/wafer-data.mjs';
 import { waferGraphDomain, waferGraphRows } from '../src/wafer-graphs.mjs';
 
-function exampleWafer(variant = 'boat', symbol = VARIANTS[variant].materials[0]) {
-  const config = VARIANTS[variant];
-  const settings = newSettings(variant, symbol);
+function exampleWafer(variant = 'boat', symbol = VARIANTS[variant].materials[0], changes = {}) {
+  const config = processConfig(variant, symbol);
+  const settings = { ...newSettings(variant, symbol), ...changes };
   const material = MATERIALS[symbol];
   const sample = rates(config, settings, material);
   const duration = 60;
@@ -60,11 +60,38 @@ test('older pulsed aluminium wafers receive compatible arcing controls when relo
   const original = exampleWafer('pulsed', 'Al');
   delete original.settings.oxygen;
   delete original.settings.frequency;
-  const { wafers: [wafer] } = readWaferFile(JSON.stringify(waferFile('Older wafers', [original])));
+  const { wafers: [wafer] } = readWaferFile(JSON.stringify({ ...waferFile('Older wafers', [original]), schema: 1 }));
   assert.equal(wafer.settings.oxygen, 0);
   assert.equal(wafer.settings.frequency, 40);
   assert.equal(wafer.recipes[0].settings.frequency, 40);
   assert.deepEqual(wafer.profile, original.profile);
+});
+
+test('legacy sputtering recipes migrate to the four methods without changing the saved film or active gas', () => {
+  const cases = [
+    { old: 'dc', method: 'dc', target: 'Ti', gas: 'nitrogen', fraction: 0, film: 'Ti' },
+    { old: 'reactive', method: 'dc', target: 'Ti', gas: 'nitrogen', fraction: 6, film: 'TiN' },
+    { old: 'itoCeramic', method: 'pulsed', target: 'ITO', gas: 'oxygen', fraction: 1.5, film: 'ITO' },
+    { old: 'itoReactive', method: 'pulsed', target: 'InSn', gas: 'oxygen', fraction: 16, film: 'ITO' },
+  ];
+  for (const { old, method, target, gas, fraction, film } of cases) {
+    const pressure = gas === 'nitrogen' ? -1.4 : -2.65;
+    const original = exampleWafer(method, target, { pressure, [gas]: fraction });
+    assert.equal(original.film, film);
+    const settings = { ...original.settings };
+    delete settings.frequency;
+    if (old === 'dc') settings.nitrogen = 6;
+    const legacy = { ...original, variant: old, settings, recipes: [{ ...original.recipes[0], settings }] };
+    const reloaded = readWaferFile(JSON.stringify({ ...waferFile('Older wafers', [legacy]), schema: 1 }));
+    const [wafer] = reloaded.wafers;
+    assert.equal(wafer.variant, method);
+    assert.equal(wafer.settings[gas], fraction);
+    assert.equal(wafer.recipes[0].settings[gas], fraction);
+    assert.equal(wafer.film, film);
+    assert.deepEqual(wafer.profile, original.profile);
+    assert.deepEqual(waferGraphRows([wafer], gas, 'netRate')[0].x, fraction);
+    assert.deepEqual(readWaferFile(JSON.stringify(reloaded)), reloaded);
+  }
 });
 
 test('wafer export filenames are short and based on the collection title', () => {

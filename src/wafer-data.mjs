@@ -1,10 +1,10 @@
 import { MATERIALS, POSITIONS } from './physics.mjs';
 import { SUBSTRATES, substrateStatus } from './instruments.mjs';
-import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups } from './content.mjs';
+import { TECHNIQUES, VARIANTS, RUN_LENGTH, controlGroups, processConfig } from './content.mjs';
 import { DEFAULT_PULSE_KHZ } from './arcing.mjs';
 
 export const STOCKER_FORMAT = 'film-factory-wafer-stocker';
-export const STOCKER_SCHEMA = 1;
+export const STOCKER_SCHEMA = 2;
 export const LIGHTBOX_COMPARE_LIMIT = 4;
 export const WAFER_FILE_BYTES = 20 * 1024 * 1024;
 export const WAFER_FILE_COUNT = 5000;
@@ -14,18 +14,39 @@ const stockerNumber = (value, min = 0, max = 1e9) => Number.isFinite(value) && v
 const stockerRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const stockerOwn = (object, key) => typeof key === 'string' && Object.hasOwn(object, key);
 
-function waferArcSettings(variant, settings) {
-  const config = VARIANTS[variant];
-  if (!config.arcing) return settings;
-  return { oxygen: 0, ...(config.duty ? { frequency: DEFAULT_PULSE_KHZ } : {}), ...settings };
+const legacySputterMethods = new Map([
+  ['reactive', { variant: 'dc', symbol: 'Ti', gas: 'nitrogen' }],
+  ['itoCeramic', { variant: 'pulsed', symbol: 'ITO', gas: 'oxygen' }],
+  ['itoReactive', { variant: 'pulsed', symbol: 'InSn', gas: 'oxygen' }],
+]);
+
+function migrateLegacyWafer(wafer) {
+  if (!stockerRecord(wafer) || !Array.isArray(wafer.recipes) || wafer.recipes.length > 12000) return wafer;
+  const legacy = legacySputterMethods.get(wafer.variant);
+  const variant = legacy?.variant ?? wafer.variant;
+  if (!stockerOwn(VARIANTS, variant) || !VARIANTS[variant].arcing) return wafer;
+  const convertSettings = (settings) => {
+    if (!stockerRecord(settings) || (legacy && settings.symbol !== legacy.symbol)) return null;
+    // Schema 1 stored N₂ = 6 even for argon-only DC and pulsed DC runs.
+    return {
+      ...settings,
+      nitrogen: legacy?.gas === 'nitrogen' ? settings.nitrogen : 0,
+      oxygen: legacy?.gas === 'oxygen' ? settings.oxygen : settings.oxygen ?? 0,
+      ...(VARIANTS[variant].duty ? { frequency: settings.frequency ?? DEFAULT_PULSE_KHZ } : {}),
+    };
+  };
+  return {
+    ...wafer, variant, settings: convertSettings(wafer.settings),
+    recipes: wafer.recipes.map((recipe) => stockerRecord(recipe)
+      ? { ...recipe, settings: convertSettings(recipe.settings) } : recipe),
+  };
 }
 
 function validWaferRecipe(variant, settings) {
-  const config = VARIANTS[variant];
-  if (!stockerRecord(settings) || !config.materials.includes(settings.symbol) || !stockerOwn(SUBSTRATES, settings.wafer)) return false;
-  const actual = waferArcSettings(variant, settings);
+  if (!stockerRecord(settings) || !VARIANTS[variant].materials.includes(settings.symbol) || !stockerOwn(SUBSTRATES, settings.wafer)) return false;
+  const config = processConfig(variant, settings.symbol);
   return controlGroups(config, MATERIALS[settings.symbol]).flat().every(([key, , , min, max]) =>
-    stockerNumber(actual[key], min - 1e-8, max + 1e-8))
+    stockerNumber(settings[key], min - 1e-8, max + 1e-8))
     && (!config.classic || typeof settings.preclean === 'boolean');
 }
 
@@ -67,18 +88,16 @@ export function waferFile(title, wafers) {
 
 export function readWaferFile(text) {
   const file = JSON.parse(text);
-  if (!stockerRecord(file) || file.format !== STOCKER_FORMAT || file.schema !== STOCKER_SCHEMA
+  if (!stockerRecord(file) || file.format !== STOCKER_FORMAT || ![1, STOCKER_SCHEMA].includes(file.schema)
     || typeof file.title !== 'string' || file.title.length > 100 || !Array.isArray(file.wafers)
-    || file.wafers.length > WAFER_FILE_COUNT || !file.wafers.every(validWafer)) {
+    || file.wafers.length > WAFER_FILE_COUNT) {
     throw new Error('This file does not contain a valid Film Factory wafer collection.');
   }
-  for (const wafer of file.wafers) {
-    wafer.settings = waferArcSettings(wafer.variant, wafer.settings);
-    if (VARIANTS[wafer.variant].arcing) {
-      wafer.recipes = wafer.recipes.map((recipe) => ({ ...recipe, settings: waferArcSettings(wafer.variant, recipe.settings) }));
-    }
+  const wafers = file.schema === 1 ? file.wafers.map(migrateLegacyWafer) : file.wafers;
+  if (!wafers.every(validWafer)) {
+    throw new Error('This file does not contain a valid Film Factory wafer collection.');
   }
-  return file;
+  return waferFile(file.title, wafers);
 }
 
 export function waferFilename(title, date = new Date()) {

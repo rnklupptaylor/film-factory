@@ -1,7 +1,6 @@
 import { MATERIALS, POSITIONS, rates } from './physics.mjs';
-import { hasAluminaRecipe } from './arcing.mjs';
-import { SUBSTRATES, crystalFrequencyShift } from './instruments.mjs';
-import { VARIANTS, controlGroups } from './content.mjs';
+import { SUBSTRATES, crystalFrequencyShift, processGas } from './instruments.mjs';
+import { controlGroups, processConfig } from './content.mjs';
 import { chartMarkup, sci } from './graphics.mjs';
 import { makeMorphology } from './microstructure.mjs';
 import { FilmLightbox } from './lightbox.mjs';
@@ -23,7 +22,7 @@ const stockerNum = (value, digits = 2) => value !== 0 && Math.abs(value) < 10 **
   ? sci(value, 1) : Number(value.toFixed(digits)).toString().replace('-', '−');
 const stockerUniformity = (wafer) => stockerCentre(wafer) > 0 ? 100 * wafer.profile[0] / stockerCentre(wafer) : null;
 const stockerLabel = (wafer) => `${wafer.profile.some((height) => height > 0) ? stockerMaterial(wafer.film) : 'Bare wafer'} · ${shortWafer(wafer)}`;
-const stockerSettings = (wafer, settings = wafer.settings) => controlGroups(VARIANTS[wafer.variant], MATERIALS[settings.symbol]).flat();
+const stockerSettings = (config, settings) => controlGroups(config, MATERIALS[settings.symbol]).flat();
 
 function stockerSettingValue(config, settings, key, unit) {
   const value = settings[key];
@@ -33,25 +32,34 @@ function stockerSettingValue(config, settings, key, unit) {
 }
 
 function stockerSourceSettings(wafer) {
-  return controlGroups(VARIANTS[wafer.variant], MATERIALS[wafer.settings.symbol])[0].map(([key, , symbol, , , , unit]) =>
-    `${symbol} ${stockerSettingValue(VARIANTS[wafer.variant], wafer.settings, key, unit)}`).join(' · ');
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
+  return controlGroups(config, MATERIALS[wafer.settings.symbol])[0].map(([key, , symbol, , , , unit]) =>
+    `${symbol} ${stockerSettingValue(config, wafer.settings, key, unit)}`).join(' · ');
 }
 
 function stockerRecipeMarkup(wafer) {
-  const config = VARIANTS[wafer.variant];
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
   let elapsed = 0;
-  const common = stockerSettings(wafer).map(([key, label, , , , , unit]) =>
+  const common = stockerSettings(config, wafer.settings).map(([key, label, , , , , unit]) =>
     `<div><dt>${label}</dt><dd>${stockerSettingValue(config, wafer.settings, key, unit)}</dd></div>`).join('');
   const steps = wafer.recipes.map(({ settings, duration, film }, index) => {
     const start = elapsed;
     elapsed += duration;
     const former = wafer.recipes[index - 1]?.settings;
-    const values = stockerSettings(wafer, settings).filter(([key]) => former?.[key] !== settings[key])
-      .map(([key, label, , , , , unit]) => `${label} ${stockerSettingValue(config, settings, key, unit)}`);
+    const stepConfig = processConfig(wafer.variant, settings.symbol);
+    const values = stockerSettings(stepConfig, settings).filter(([key]) => former?.[key] !== settings[key])
+      .map(([key, label, , , , , unit]) => `${label} ${stockerSettingValue(stepConfig, settings, key, unit)}`);
     if (!former || former.preclean !== settings.preclean) values.unshift(settings.preclean ? 'Pre-clean' : 'Deposition');
     return `<li><strong>${stockerNum(start, 1)}–${stockerNum(elapsed, 1)} s</strong> · ${film ? stockerMaterial(film) : 'Coating source off'} · ${values.join(' · ')}</li>`;
   }).join('');
   return `<dl class="wafer-settings">${common}</dl><p>Source and Zone model use the final settings. Time plots show the saved stage. The steps below include any preceding stages retained on this wafer.</p><ol class="wafer-steps">${steps}</ol>`;
+}
+
+function stockerReactiveGas(wafer) {
+  const config = processConfig(wafer.variant, wafer.settings.symbol);
+  if (config.arc) return 'N₂';
+  const gas = processGas(config, wafer.settings)?.species.find(([name, fraction]) => name !== 'Ar' && fraction > 0);
+  return gas ? `${gas[0]} · ${stockerNum(gas[1] * 100)}%` : '—';
 }
 
 const stockerColumns = [
@@ -68,9 +76,7 @@ const stockerColumns = [
   ['pressure', 'p (mbar)', (wafer) => 10 ** wafer.settings.pressure, (value) => sci(value)],
   ['gap', 'L (cm)', (wafer) => wafer.settings.distance],
   ['source', 'Source settings', stockerSourceSettings],
-  ['gas', 'Reactive gas', (wafer) => VARIANTS[wafer.variant].arc ? 'N₂' : VARIANTS[wafer.variant].reactive
-    ? `N₂ · ${wafer.settings.nitrogen}%` : VARIANTS[wafer.variant].ito
-      || (wafer.settings.oxygen > 0 && hasAluminaRecipe(VARIANTS[wafer.variant], wafer.settings.symbol)) ? `O₂ · ${wafer.settings.oxygen}%` : '—'],
+  ['gas', 'Reactive gas', stockerReactiveGas],
   ['created', 'Added', (wafer) => wafer.created, (value) => stockerDate.format(value)],
 ];
 
@@ -124,7 +130,7 @@ function compareWaferThickness(wafers) {
 }
 
 function compareWaferProcess(wafers) {
-  const models = wafers.map((wafer) => rates(VARIANTS[wafer.variant], wafer.settings, MATERIALS[wafer.settings.symbol]));
+  const models = wafers.map(({ variant, settings }) => rates(processConfig(variant, settings.symbol), settings, MATERIALS[settings.symbol]));
   const rows = [
     ['Technique', wafers.map((wafer) => waferClassification(wafer).technique)],
     ['Subtechnique', wafers.map((wafer) => waferClassification(wafer).subtechnique)],
@@ -159,7 +165,7 @@ function compareWaferProcess(wafers) {
 
 function compareWaferZones(wafers) {
   const entries = wafers.map((wafer, index) => {
-    const config = VARIANTS[wafer.variant];
+    const config = processConfig(wafer.variant, wafer.settings.symbol);
     const sample = rates(config, wafer.settings, MATERIALS[wafer.settings.symbol]);
     return { wafer, model: zoneModel(config, wafer.settings, sample), label: index + 1, colour: stockerColours[index % stockerColours.length] };
   });

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { VARIANTS, controlGroups, newSettings } from '../src/content.mjs';
+import { VARIANTS, controlGroups, newSettings, processConfig } from '../src/content.mjs';
 import { SUBSTRATES } from '../src/instruments.mjs';
 import { MATERIALS, rates } from '../src/physics.mjs';
 import { groupZoneModels, zoneDiagramMarkup, zoneModel } from '../src/zones.mjs';
 
 function plotFor(method, symbol = VARIANTS[method].materials[0], changes = {}) {
-  const config = VARIANTS[method];
+  const config = processConfig(method, symbol);
   const settings = { ...newSettings(method, symbol), ...changes };
   return zoneModel(config, settings, rates(config, settings, MATERIALS[settings.symbol]));
 }
@@ -29,7 +29,7 @@ test('metal sputtering compares argon pressure and distinguishes extrapolation',
   assert.match(low.reading, /Zone T/);
   assert.match(high.reading, /Zone I/);
   assert.match(plotFor('dc', 'Cu', { pressure:-1 }).reading, /Outside/);
-  const mixed = plotFor('reactive', 'Ti', { pressure: -2, nitrogen: 10 });
+  const mixed = plotFor('dc', 'Ti', { pressure: -2, nitrogen: 10 });
   assert.equal(mixed.kind, 'thornton');
   assert.equal(mixed.point[1], .9);
   assert.match(plotFor('diode').detail, /conventional DC diode/);
@@ -37,14 +37,14 @@ test('metal sputtering compares argon pressure and distinguishes extrapolation',
 });
 
 test('compound recipes report the relevant process axes without unsupported zone numbers', () => {
-  const reactive = plotFor('reactive', 'Ti');
+  const reactive = plotFor('dc', 'Ti', { pressure: -1.4, nitrogen: 6 });
   assert.equal(reactive.kind, 'window');
   assert.match(reactive.y.label, /N₂ partial/);
   assert.match(reactive.detail, /at the film/);
-  const ao = plotFor('itoReactive', 'InSn', { oxygen: 0 });
+  const ao = plotFor('pulsed', 'InSn', { oxygen: 0 });
   assert.equal(ao.point[1], 0);
   assert.match(ao.reading, /In–Sn$/);
-  assert.match(plotFor('itoCeramic').reading, /ITO$/);
+  assert.match(plotFor('pulsed', 'ITO').reading, /ITO$/);
   assert.match(plotFor('rf').reading, /Amorphous/);
 });
 
@@ -62,10 +62,10 @@ test('ion assistance, arc study and pre-clean use different comparisons', () => 
 });
 
 test('comparison groups shared zone axes and keeps distinct study overlays separate', () => {
-  const methods = ['classic', 'ibad', 'itoCeramic', 'itoReactive', 'dc', 'diode', 'boat'];
-  const groups = groupZoneModels(methods.map((method) => ({ method, model: plotFor(method) })));
-  assert.deepEqual(groups.map((group) => group.map(({ method }) => method)),
-    [['classic', 'ibad'], ['itoCeramic'], ['itoReactive'], ['dc', 'diode'], ['boat']]);
+  const recipes = [['classic'], ['ibad'], ['pulsed', 'ITO'], ['pulsed', 'InSn'], ['dc'], ['diode'], ['boat']];
+  const groups = groupZoneModels(recipes.map((recipe) => ({ recipe, model: plotFor(...recipe) })));
+  assert.deepEqual(groups.map((group) => group.map(({ recipe }) => recipe)),
+    [[['classic'], ['ibad']], [['pulsed', 'ITO']], [['pulsed', 'InSn']], [['dc'], ['diode']], [['boat']]]);
 });
 
 test('comparison marks show coincident operating points together and preserve the original zone artwork', () => {
@@ -83,8 +83,9 @@ test('comparison marks show coincident operating points together and preserve th
 });
 
 test('every selectable method and control endpoint has a finite diagram position', () => {
-  for (const [method, config] of Object.entries(VARIANTS)) {
-    for (const symbol of config.materials) {
+  for (const [method, { materials }] of Object.entries(VARIANTS)) {
+    for (const symbol of materials) {
+      const config = processConfig(method, symbol);
       for (const wafer of Object.keys(SUBSTRATES)) {
         const material = MATERIALS[symbol];
         for (const [key, , , low, high] of controlGroups(config, material).flat()) {
